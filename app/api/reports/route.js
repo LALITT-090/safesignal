@@ -205,6 +205,27 @@ export async function PATCH(request) {
     const reviewNotes = normalizeOptionalText(body.review_notes || "");
     const reviewedBy = normalizeOptionalText(body.reviewed_by || "");
 
+    const hasAuthorityFields = Boolean(
+      body.status !== undefined ||
+      body.review_notes !== undefined ||
+      body.reviewed_by !== undefined
+    );
+
+    if (hasAuthorityFields) {
+      const supabaseAuth = await createSupabaseServerClient();
+      const {
+        data: { user },
+      } = await supabaseAuth.auth.getUser();
+
+      if (!user) {
+        return NextResponse.json({ error: "Authority sign-in required." }, { status: 401 });
+      }
+
+      if (!isAuthorityUser(user)) {
+        return NextResponse.json({ error: "Authority access required." }, { status: 403 });
+      }
+    }
+
     if (!reportId) {
       return NextResponse.json(
         {
