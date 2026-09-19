@@ -1,0 +1,150 @@
+"use client";
+
+import { FormEvent, useState } from "react";
+
+export default function ReportStatusPage() {
+  const [reportId, setReportId] = useState("");
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [lookupError, setLookupError] = useState("");
+  const [saveError, setSaveError] = useState("");
+  const [reportFound, setReportFound] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  async function handleLookup(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLookupError("");
+    setSaveError("");
+    setSaved(false);
+
+    if (!reportId.trim()) {
+      setLookupError("Enter your Report ID.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await fetch(`/api/reports?report_id=${encodeURIComponent(reportId.trim())}`);
+      const result = await response.json();
+
+      if (!response.ok || !result.report) {
+        throw new Error("No report was found for that ID.");
+      }
+
+      setReportFound(true);
+      setDescription(result.report.description ?? "");
+    } catch (error) {
+      setReportFound(false);
+      setLookupError(
+        error instanceof Error ? error.message : "Unable to find this report."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSaveDescription() {
+    if (!reportId.trim()) {
+      setSaveError("Enter your Report ID first.");
+      return;
+    }
+
+    setSaveError("");
+    setLoading(true);
+
+    try {
+      const response = await fetch("/api/reports", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          report_id: reportId.trim(),
+          description: description.trim() || "",
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Unable to save the description.");
+      }
+
+      setSaved(true);
+    } catch (error) {
+      setSaveError(
+        error instanceof Error ? error.message : "Unable to save the description."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
+      <div className="mx-auto max-w-xl rounded-3xl border border-slate-800 bg-slate-900 p-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">
+          SafeSignal
+        </p>
+        <h1 className="mt-3 text-3xl font-bold">Report status</h1>
+
+        <form onSubmit={handleLookup} className="mt-6 space-y-4">
+          <label className="block text-sm font-medium">Your Report ID</label>
+          <input
+            value={reportId}
+            onChange={(event) => setReportId(event.target.value)}
+            placeholder="SS-XXXXXX"
+            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {loading ? "Checking..." : "Find Report"}
+          </button>
+
+          {lookupError && (
+            <p className="text-sm text-red-300">{lookupError}</p>
+          )}
+        </form>
+
+        {reportFound && (
+          <div className="mt-8 rounded-2xl border border-slate-700 bg-slate-950 p-5">
+            <label className="mb-2 block text-sm font-medium text-white">
+              Additional description
+            </label>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              rows={6}
+              placeholder="Describe what happened, what you noticed, or any other useful detail..."
+              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
+            />
+
+            {saveError && (
+              <p className="mt-3 text-sm text-red-300">{saveError}</p>
+            )}
+
+            {saved && (
+              <p className="mt-3 text-sm text-emerald-300">
+                Description saved to your report.
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSaveDescription}
+              disabled={loading}
+              className="mt-4 w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Saving..." : "Save Description"}
+            </button>
+          </div>
+        )}
+      </div>
+    </main>
+  );
+}
