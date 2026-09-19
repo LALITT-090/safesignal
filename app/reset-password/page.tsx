@@ -2,73 +2,113 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "../../lib/supabase/browser";
 
 const MIN_PASSWORD_LENGTH = 8;
+const EXPIRED_RESET_LINK_ERROR =
+  "This password reset link has expired or has already been used. Please request a new one below.";
+
+function getExpiredResetLinkState() {
+  if (typeof window === "undefined") {
+    return { hasExpiredLink: false, status: "checking" as const, error: "" };
+  }
+
+  const hash = window.location.hash;
+  const search = window.location.search;
+  const searchParams = new URLSearchParams(search);
+  const hasOtpExpired =
+    hash.includes("error_code=otp_expired") ||
+    hash.includes("access_denied") ||
+    searchParams.get("error_code") === "otp_expired" ||
+    searchParams.get("error") === "access_denied";
+
+  if (hasOtpExpired) {
+    return { hasExpiredLink: true, status: "request" as const, error: EXPIRED_RESET_LINK_ERROR };
+  }
+
+  return { hasExpiredLink: false, status: "checking" as const, error: "" };
+}
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const initialResetLinkState = useMemo(() => getExpiredResetLinkState(), []);
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [status, setStatus] = useState<"checking" | "invalid" | "ready" | "request-sent">("checking");
-  const [error, setError] = useState("");
+  const [status, setStatus] = useState<"checking" | "request" | "ready" | "request-sent">(initialResetLinkState.status);
+  const [error, setError] = useState(initialResetLinkState.error);
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-
     const supabase = createSupabaseBrowserClient();
+
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    const searchParams = new URLSearchParams(search);
+
+    if (initialResetLinkState.hasExpiredLink) {
+      return;
+    }
+
+    const hasRecoverySignal =
+      hash.includes("type=recovery") ||
+      hash.includes("access_token") ||
+      searchParams.has("code");
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
 
-      if (event === "PASSWORD_RECOVERY" || session) {
-        const { data: userData, error: userError } = await supabase.auth.getUser();
-
-        if (cancelled) {
-          return;
-        }
-
-        if (userError || !userData.user) {
-          setError("This password reset link has expired or is invalid.");
-          setStatus("invalid");
-          return;
-        }
-
+      if (event === "PASSWORD_RECOVERY" || (session && hasRecoverySignal)) {
         setStatus("ready");
+        setError("");
       }
     });
 
-    async function checkRecoverySession() {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
-
-      if (cancelled) {
-        return;
+    async function checkSession() {
+      const code = searchParams.get("code");
+      if (code) {
+        try {
+          const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+          if (!exchangeError) {
+            if (!cancelled) {
+              setStatus("ready");
+              setError("");
+              return;
+            }
+          }
+        } catch {
+          // fallback
+        }
       }
 
-      if (userError || !userData.user) {
-        setError("This password reset link has expired or is invalid.");
-        setStatus("invalid");
-        return;
+      if (hasRecoverySignal) {
+        const { data: userData } = await supabase.auth.getUser();
+        if (cancelled) return;
+
+        if (userData?.user) {
+          setStatus("ready");
+          setError("");
+          return;
+        }
       }
 
-      setStatus("ready");
+      if (!cancelled) {
+        setStatus("request");
+      }
     }
 
-    void checkRecoverySession();
+    void checkSession();
 
     return () => {
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [initialResetLinkState.hasExpiredLink]);
 
   async function handleRequestReset(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -83,9 +123,14 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    const redirectUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/reset-password`
+        : "http://localhost:3000/reset-password";
+
     const supabase = createSupabaseBrowserClient();
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-      redirectTo: "http://localhost:3000/reset-password",
+      redirectTo: redirectUrl,
     });
 
     if (resetError) {
@@ -94,7 +139,7 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setSuccess("If that account exists, a password reset email has been sent.");
+    setSuccess("If an account exists for that email, a password reset email has been sent.");
     setStatus("request-sent");
     setLoading(false);
   }
@@ -121,7 +166,8 @@ export default function ResetPasswordPage() {
     const { data: userData, error: userError } = await supabase.auth.getUser();
 
     if (userError || !userData.user) {
-      setError("This password reset link has expired or is invalid.");
+      setError("This password reset link has expired or is invalid. Please request a new link.");
+      setStatus("request");
       setLoading(false);
       return;
     }
@@ -136,12 +182,12 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    setSuccess("Password updated successfully.");
+    setSuccess("Password updated successfully. Redirecting to sign in...");
     setLoading(false);
     await supabase.auth.signOut();
     setTimeout(() => {
       router.push("/login");
-    }, 1200);
+    }, 1500);
   }
 
   return (
@@ -150,33 +196,46 @@ export default function ResetPasswordPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">SafeSignal</p>
 
         {status === "checking" && (
-          <>
-            <h1 className="mt-3 text-3xl font-bold">Checking reset link</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Verifying your password reset session.
-            </p>
-          </>
+          <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-400">
+            Checking your reset link...
+          </div>
         )}
 
-        {status === "invalid" && (
+        {status === "request" && (
           <>
-            <h1 className="mt-3 text-3xl font-bold">Reset link unavailable</h1>
+            <h1 className="mt-3 text-3xl font-bold">Reset password</h1>
             <p className="mt-3 text-sm leading-6 text-slate-400">
-              This password reset link has expired or is invalid.
+              Enter the email address associated with your SafeSignal authority account to receive a reset link.
             </p>
-            <div className="mt-6 space-y-4">
-              {error && (
-                <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
-                  {error}
-                </p>
-              )}
-              <Link
-                href="/login"
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
+
+            {error && (
+              <p role="alert" className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                {error}
+              </p>
+            )}
+
+            <form onSubmit={handleRequestReset} className="mt-6 space-y-5">
+              <div>
+                <label htmlFor="reset-email" className="mb-2 block text-sm font-medium">Email</label>
+                <input
+                  id="reset-email"
+                  type="email"
+                  autoComplete="username"
+                  required
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="min-h-12 w-full rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Request a new reset link
-              </Link>
-            </div>
+                {loading ? "Sending reset link..." : "Send reset link"}
+              </button>
+            </form>
           </>
         )}
 
@@ -257,40 +316,7 @@ export default function ResetPasswordPage() {
           </>
         )}
 
-        {status !== "ready" && status !== "invalid" && status !== "request-sent" && (
-          <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-400">
-            Checking your reset link...
-          </div>
-        )}
-
-        {status !== "ready" && status !== "checking" && status !== "request-sent" && (
-          <div className="mt-6">
-            <form onSubmit={handleRequestReset} className="space-y-4">
-              <div>
-                <label htmlFor="reset-email" className="mb-2 block text-sm font-medium">Email</label>
-                <input
-                  id="reset-email"
-                  type="email"
-                  autoComplete="username"
-                  required
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 font-semibold text-white transition hover:border-slate-500 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {loading ? "Sending reset link..." : "Request reset link"}
-              </button>
-            </form>
-          </div>
-        )}
-
-        <div className="mt-6">
+        <div className="mt-6 border-t border-slate-800 pt-6">
           <Link href="/login" className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 font-semibold text-white transition hover:border-slate-500">
             Back to sign in
           </Link>

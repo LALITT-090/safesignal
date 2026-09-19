@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { isAuthorityUser } from "../../lib/supabase/authority";
 import { createSupabaseBrowserClient } from "../../lib/supabase/browser";
 
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,57 +16,84 @@ export default function LoginPage() {
 
   useEffect(() => {
     async function checkCurrentSession() {
-      const supabase = createSupabaseBrowserClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (user && isAuthorityUser(user)) {
-        router.replace(searchParams.get("next") || "/dashboard");
-        return;
+        if (user && isAuthorityUser(user)) {
+          const destination = searchParams.get("next") || "/dashboard";
+          window.location.href = destination;
+          return;
+        }
+
+        if (user && !isAuthorityUser(user)) {
+          setError("This account is not authorized to access the SafeSignal authority tools.");
+        }
+      } catch {
+        // Continue to login form
+      } finally {
+        setSessionChecking(false);
       }
-
-      if (user && !isAuthorityUser(user)) {
-        setError("This account is not authorized to access the SafeSignal authority tools.");
-      }
-
-      setSessionChecking(false);
     }
 
     void checkCurrentSession();
-  }, [router, searchParams]);
+  }, [searchParams]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setLoading(true);
 
-    const supabase = createSupabaseBrowserClient();
-    const { data, error: signInError } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password,
-    });
-
-    if (signInError) {
-      setError("We could not sign you in. Check your credentials or contact an administrator.");
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) {
+      setError("Please enter both your email address and password.");
       setLoading(false);
       return;
     }
 
-    const {
-      data: { user: sessionUser },
-    } = await supabase.auth.getUser();
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      });
 
-    const user = sessionUser ?? data.user;
-    if (!user || !isAuthorityUser(user)) {
-      await supabase.auth.signOut();
-      setError("This account is not authorized to access the SafeSignal authority tools.");
+      if (signInError) {
+        if (signInError.message.toLowerCase().includes("invalid login credentials")) {
+          setError("Invalid email or password. Please verify your credentials or reset your password.");
+        } else if (signInError.message.toLowerCase().includes("email not confirmed")) {
+          setError("Email address is not confirmed. Please check your inbox or contact an administrator.");
+        } else {
+          setError(signInError.message || "We could not sign you in. Check your credentials or contact an administrator.");
+        }
+        setLoading(false);
+        return;
+      }
+
+      const {
+        data: { user: sessionUser },
+      } = await supabase.auth.getUser();
+
+      const user = sessionUser ?? data.user;
+      if (!user || !isAuthorityUser(user)) {
+        await supabase.auth.signOut();
+        setError("This account is not authorized to access the SafeSignal authority tools.");
+        setLoading(false);
+        return;
+      }
+
+      const destination = searchParams.get("next") || "/dashboard";
+      window.location.href = destination;
+    } catch (submitError) {
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "An unexpected error occurred during sign in."
+      );
       setLoading(false);
-      return;
     }
-
-    router.replace(searchParams.get("next") || "/dashboard");
-    router.refresh();
   }
 
   return (

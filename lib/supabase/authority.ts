@@ -19,7 +19,9 @@ export function isAuthorityUser(user: User | null) {
     return false;
   }
 
-  const role = normalizeEmail(String(user.app_metadata?.role ?? ""));
+  const appRole = normalizeEmail(String(user.app_metadata?.role ?? ""));
+  const userRole = normalizeEmail(String(user.user_metadata?.role ?? ""));
+  const role = appRole || userRole;
   const email = normalizeEmail(user.email);
   const allowlist = configuredAuthorityEmails();
 
