@@ -72,7 +72,11 @@ export async function searchLocations(query: string) {
   url.searchParams.set("format", "jsonv2");
   url.searchParams.set("addressdetails", "1");
   url.searchParams.set("limit", "6");
-  url.searchParams.set("countrycodes", "in");
+
+  const configuredCountryCodes = process.env.NOMINATIM_COUNTRY_CODES?.trim();
+  if (configuredCountryCodes) {
+    url.searchParams.set("countrycodes", configuredCountryCodes);
+  }
 
   const response = await fetch(url, {
     headers: getGeocodingHeaders(),
