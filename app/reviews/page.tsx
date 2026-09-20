@@ -114,69 +114,53 @@ export default function ReviewsPage() {
     }
   }
 
-  async function handleSignOut() {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
-
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-8 py-6 text-slate-400">Loading review queue...</div>
+      <main className="flex min-h-screen items-center justify-center bg-[#FAF8F5] text-[#3B3540]">
+        <div className="safe-card px-8 py-6 text-[#5E5967]">Loading review queue...</div>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white p-8">
-        <div className="mx-auto max-w-2xl rounded-2xl border border-red-500/30 bg-red-500/10 p-8">
-          <h1 className="text-xl font-bold text-red-300">Review queue unavailable</h1>
-          <p className="mt-3 text-red-200">{error}</p>
+      <main className="bg-[#FAF8F5] p-8 text-[#3B3540]">
+        <div className="page-shell max-w-2xl rounded-3xl border border-[#E7E0E3] bg-[#FFF9F8] p-8">
+          <h1 className="text-xl font-extrabold text-[#B94A48]">Review queue unavailable</h1>
+          <p className="mt-3 text-[#7D5F6E]">{error}</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 bg-slate-900">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+    <main className="bg-[#FAF8F5] py-10 text-[#3B3540] md:py-12">
+      <div className="page-shell">
+        <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-400">SafeSignal</p>
-            <h1 className="mt-1 text-3xl font-bold">Human Review Queue</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#432A52]">Authority review</p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">
+              {primaryPattern ? `Reviewing ${primaryPattern.label}` : "Review queue"}
+            </h1>
           </div>
-
-          <div className="flex items-center gap-3">
-            <a href="/dashboard" className="rounded-full border border-slate-700 px-5 py-2 text-sm text-slate-200 hover:bg-slate-800">Back to Dashboard</a>
-            <button type="button" onClick={handleSignOut} className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 hover:bg-slate-800">Sign out</button>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E0E3] bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#432A52]">
+            {primaryPattern ? "Human review required" : "Monitoring"}
           </div>
         </div>
-      </header>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-8">
-          <p className="text-sm font-medium text-amber-400">HUMAN REVIEW REQUIRED</p>
-          <h2 className="mt-2 text-2xl font-bold">{primaryPattern ? `Emerging Pattern: ${primaryPattern.label}` : "No active pattern"}</h2>
-          <p className="mt-2 max-w-3xl text-slate-400">
-            {primaryPattern
-              ? "SafeSignal has identified rising reported safety activity in this area using anonymous submissions, spatial proximity, time similarity, and related behavioural signals."
-              : "No connected pattern is currently being surfaced for review."}
-          </p>
-        </div>
-
-        <section className="mb-6 rounded-2xl border border-amber-500/30 bg-slate-900 p-6">
+        <section className="mb-6 safe-card p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm text-slate-400">Review status</p>
-              <p className="mt-1 text-2xl font-bold text-amber-400">{status}</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Review status</p>
+              <p className="mt-2 text-3xl font-extrabold text-[#2D1B36]">{status}</p>
             </div>
-            <div className="text-sm text-slate-400">Human decision required</div>
+            <div className="rounded-full border border-[#E7E0E3] bg-[#FAF8F5] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#432A52]">
+              Human decision required
+            </div>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard label="Related Reports" value={String(relatedCount)} />
           <MetricCard label="Corroboration Support" value={`${corroborationScore}/100`} accent="emerald" />
           <MetricCard label="Recent Activity" value={String(recentCount)} />
@@ -185,81 +169,88 @@ export default function ReviewsPage() {
         </section>
 
         {primaryPattern ? (
-          <>
-            <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <h3 className="text-xl font-bold">Why this pattern was flagged</h3>
-              <p className="mt-2 text-sm text-slate-400">The connection explanation below reflects the strongest support signals from the cluster.</p>
-              <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-                {primaryPattern.connectionExplanation.map((item, index) => (
-                  <div key={`${item}-${index}`} className="rounded-xl border border-slate-800 bg-slate-950 p-5">
-                    <p className="text-sm text-slate-400">{index === 0 ? "Location" : index === 1 ? "Time" : index === 2 ? "Category" : index === 3 ? "Behaviour" : "Reporter diversity"}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-200">{item}</p>
+          <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
+            <aside className="safe-card p-5 md:p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Pattern review</p>
+                  <h2 className="mt-2 text-2xl font-extrabold text-[#2D1B36]">{primaryPattern.label}</h2>
+                </div>
+                <span className="status-badge status-badge--medium">{status}</span>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                <div className="rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Rising reported safety activity</p>
+                  <p className="mt-2 text-3xl font-extrabold text-[#2D1B36]">+{primaryPattern.risingPercent || 0}%</p>
+                </div>
+
+                <div className="rounded-2xl border border-[#E7E0E3] bg-white p-4">
+                  <p className="text-sm font-bold text-[#2D1B36]">Why this pattern was flagged</p>
+                  <div className="mt-4 space-y-3">
+                    {primaryPattern.connectionExplanation.map((item, index) => (
+                      <div key={`${item}-${index}`} className="rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] p-3">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#432A52]">
+                          {index === 0 ? "Location" : index === 1 ? "Time" : index === 2 ? "Category" : index === 3 ? "Behaviour" : "Reporter diversity"}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-[#5E5967]">{item}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </section>
+                </div>
 
-            <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="rounded-2xl border border-[#E7E0E3] bg-white p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-[#2D1B36]">Reporting behaviour</p>
+                    <span className={`status-badge ${primaryPattern.suspicious ? "status-badge--medium" : "status-badge--low"}`}>
+                      {reportingBehaviourStatus}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[#5E5967]">{reportingBehaviourMessage}</p>
+                </div>
+              </div>
+            </aside>
+
+            <section className="safe-card p-5 md:p-6">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <h3 className="text-xl font-bold">Reporting behaviour</h3>
-                  <p className="mt-2 text-sm text-slate-400">{reportingBehaviourMessage}</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Review action</p>
+                  <h2 className="mt-2 text-2xl font-extrabold text-[#2D1B36]">Human review workspace</h2>
                 </div>
-                <div>
-                  <p className="text-xs uppercase text-slate-500">Status</p>
-                  <p className={`mt-1 text-xl font-bold ${primaryPattern.suspicious ? "text-amber-400" : "text-emerald-400"}`}>{reportingBehaviourStatus}</p>
-                </div>
-              </div>
-              <div className="mt-5 rounded-xl border border-slate-800 bg-slate-950 p-4 text-sm text-slate-400">
-                This signal looks for unusually concentrated or highly similar reporting behaviour. It is a review signal, not a determination that reports are false.
-              </div>
-            </section>
-
-            <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <h3 className="text-xl font-bold">Rising reported safety activity</h3>
-              <p className="mt-2 text-sm text-slate-400">Recent activity is higher than the previous comparison period.</p>
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-xl bg-slate-950 p-5">
-                  <p className="text-sm text-slate-400">Recent 7-day window</p>
-                  <p className="mt-2 text-4xl font-bold text-amber-400">{recentCount}</p>
-                  <p className="mt-2 text-sm text-slate-500">related reports</p>
-                </div>
-                <div className="rounded-xl bg-slate-950 p-5">
-                  <p className="text-sm text-slate-400">Previous 7-day window</p>
-                  <p className="mt-2 text-4xl font-bold">{previousCount}</p>
-                  <p className="mt-2 text-sm text-slate-500">related reports</p>
+                <div className="rounded-full border border-[#E7E0E3] bg-[#FAF8F5] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#432A52]">
+                  {relatedCount} related
                 </div>
               </div>
-            </section>
 
-            <section className="mt-6 rounded-2xl border border-emerald-500/30 bg-slate-900 p-6">
-              <h3 className="text-xl font-bold">Human review action</h3>
-              <p className="mt-2 text-sm text-slate-400">Review the available reports and supporting signals before deciding what action, if any, is appropriate.</p>
+              <label className="mt-6 block text-sm font-bold text-[#2D1B36]">Review notes</label>
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                placeholder="Add review notes..."
+                className="input-shell mt-2 min-h-[140px] resize-none"
+              />
 
-              <label className="mt-6 block text-sm font-medium text-slate-300">Reviewer notes</label>
-              <textarea value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Add review notes..." className="mt-2 min-h-32 w-full rounded-xl border border-slate-700 bg-slate-950 p-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-emerald-500" />
-
-              {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+              {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
 
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <button type="button" onClick={() => handleReviewAction("under_review")} disabled={saving} className="rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="button" onClick={() => handleReviewAction("under_review")} disabled={saving} className="primary-btn flex-1">
                   {saving ? "Saving..." : "Mark as Investigating"}
                 </button>
-                <button type="button" onClick={() => handleReviewAction("reviewed")} disabled={saving} className="rounded-xl border border-slate-700 px-5 py-3 font-semibold text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+                <button type="button" onClick={() => handleReviewAction("reviewed")} disabled={saving} className="secondary-btn flex-1">
                   {saving ? "Saving..." : "Dismiss"}
                 </button>
               </div>
             </section>
-          </>
+          </div>
         ) : (
-          <section className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-300">
+          <section className="mt-8 safe-card p-6 text-[#5C628F]">
             No active pattern is currently available for review. The queue is empty until a connected cluster emerges.
           </section>
         )}
 
-        <section className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
-          <p className="font-semibold text-amber-400">Important</p>
-          <p className="mt-2 text-sm leading-6 text-slate-400">SafeSignal surfaces reported patterns for human review. It does not determine guilt, identify perpetrators, or make enforcement decisions.</p>
+        <section className="mt-8 rounded-3xl border border-[#E7E0E3] bg-white p-5 text-[#5E5967]">
+          <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#432A52]">Important</p>
+          <p className="mt-2 text-sm leading-7">SafeSignal surfaces reported patterns for human review. It does not determine guilt, identify perpetrators, or make enforcement decisions.</p>
         </section>
       </div>
     </main>
@@ -268,14 +259,14 @@ export default function ReviewsPage() {
 
 function MetricCard({ label, value, accent = "default" }: { label: string; value: string; accent?: "default" | "emerald" }) {
   const styles = {
-    default: "border-slate-800 bg-slate-900 text-white",
-    emerald: "border-emerald-500/30 bg-slate-900 text-emerald-400",
+    default: "border-[#E7E0E3] bg-white text-[#2D1B36]",
+    emerald: "border-[#C7F9D9] bg-[#ECFDF5] text-[#15803d]",
   }[accent];
 
   return (
-    <div className={`rounded-2xl border p-5 ${styles}`}>
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className="mt-2 text-3xl font-bold">{value}</p>
+    <div className={`metric-card p-5 ${styles}`}>
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.16em]">{label}</h3>
+      <strong className="mt-3 block">{value}</strong>
     </div>
   );
 }

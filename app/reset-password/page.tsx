@@ -191,32 +191,32 @@ export default function ResetPasswordPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
-      <div className="mx-auto max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">SafeSignal</p>
+    <main className="min-h-screen bg-[#FAF8F5] px-6 py-16 text-[#3B3540]">
+      <div className="mx-auto max-w-md rounded-[22px] border border-[#E7E0E3] bg-[#FFFFFF] p-8 shadow-[0_18px_32px_rgba(67,42,82,0.06)]">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#432A52]">SafeSignal</p>
 
         {status === "checking" && (
-          <div className="mt-6 rounded-xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-400">
+          <div className="mt-6 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-4 text-sm text-[#5E5967]">
             Checking your reset link...
           </div>
         )}
 
         {status === "request" && (
           <>
-            <h1 className="mt-3 text-3xl font-bold">Reset password</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
+            <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">Reset password</h1>
+            <p className="mt-3 text-sm leading-6 text-[#5E5967]">
               Enter the email address associated with your SafeSignal authority account to receive a reset link.
             </p>
 
             {error && (
-              <p role="alert" className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+              <p role="alert" className="mt-6 rounded-xl border border-[#E7E0E3] bg-[#FFF9F8] p-4 text-sm text-[#B94A48]">
                 {error}
               </p>
             )}
 
             <form onSubmit={handleRequestReset} className="mt-6 space-y-5">
               <div>
-                <label htmlFor="reset-email" className="mb-2 block text-sm font-medium">Email</label>
+                <label htmlFor="reset-email" className="mb-2 block text-sm font-bold text-[#2D1B36]">Email</label>
                 <input
                   id="reset-email"
                   type="email"
@@ -224,14 +224,14 @@ export default function ResetPasswordPage() {
                   required
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
+                  className="min-h-12 w-full rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] px-4 py-3 text-[#3B3540] outline-none transition focus:border-[#432A52]"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="min-h-12 w-full rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-12 w-full rounded-xl bg-[#432A52] px-5 py-3 font-semibold text-[#FFFFFF] transition hover:bg-[#5F3E66] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Sending reset link..." : "Send reset link"}
               </button>
@@ -241,19 +241,19 @@ export default function ResetPasswordPage() {
 
         {status === "request-sent" && (
           <>
-            <h1 className="mt-3 text-3xl font-bold">Check your email</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
+            <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">Check your email</h1>
+            <p className="mt-3 text-sm leading-6 text-[#5E5967]">
               If an account exists for that email, a password reset email has been sent.
             </p>
             {success && (
-              <p className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+              <p className="mt-4 rounded-xl border border-[#E7E0E3] bg-[#F0F7F3] p-4 text-sm text-[#3F7D63]">
                 {success}
               </p>
             )}
             <div className="mt-6">
               <Link
                 href="/login"
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 font-semibold text-white transition hover:border-slate-500"
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] px-5 py-3 font-semibold text-[#2D1B36] transition hover:bg-[#F2ECF3]"
               >
                 Back to sign in
               </Link>
@@ -263,13 +263,13 @@ export default function ResetPasswordPage() {
 
         {status === "ready" && (
           <>
-            <h1 className="mt-3 text-3xl font-bold">Set a new password</h1>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
+            <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">Set a new password</h1>
+            <p className="mt-3 text-sm leading-6 text-[#5E5967]">
               Choose a new password for your SafeSignal authority account.
             </p>
             <form onSubmit={handleUpdatePassword} className="mt-8 space-y-5">
               <div>
-                <label htmlFor="new-password" className="mb-2 block text-sm font-medium">New password</label>
+                <label htmlFor="new-password" className="mb-2 block text-sm font-bold text-[#2D1B36]">New password</label>
                 <input
                   id="new-password"
                   type="password"
@@ -277,11 +277,11 @@ export default function ResetPasswordPage() {
                   required
                   value={newPassword}
                   onChange={(event) => setNewPassword(event.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
+                  className="min-h-12 w-full rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] px-4 py-3 text-[#3B3540] outline-none transition focus:border-[#432A52]"
                 />
               </div>
               <div>
-                <label htmlFor="confirm-password" className="mb-2 block text-sm font-medium">Confirm new password</label>
+                <label htmlFor="confirm-password" className="mb-2 block text-sm font-bold text-[#2D1B36]">Confirm new password</label>
                 <input
                   id="confirm-password"
                   type="password"
@@ -289,18 +289,18 @@ export default function ResetPasswordPage() {
                   required
                   value={confirmPassword}
                   onChange={(event) => setConfirmPassword(event.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
+                  className="min-h-12 w-full rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] px-4 py-3 text-[#3B3540] outline-none transition focus:border-[#432A52]"
                 />
               </div>
 
               {error && (
-                <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">
+                <p role="alert" className="rounded-xl border border-[#E7E0E3] bg-[#FFF9F8] p-4 text-sm text-[#B94A48]">
                   {error}
                 </p>
               )}
 
               {success && (
-                <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">
+                <p className="rounded-xl border border-[#E7E0E3] bg-[#F0F7F3] p-4 text-sm text-[#3F7D63]">
                   {success}
                 </p>
               )}
@@ -308,7 +308,7 @@ export default function ResetPasswordPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="min-h-12 w-full rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+                className="min-h-12 w-full rounded-xl bg-[#432A52] px-5 py-3 font-semibold text-[#FFFFFF] transition hover:bg-[#5F3E66] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loading ? "Updating password..." : "Update password"}
               </button>
@@ -316,8 +316,8 @@ export default function ResetPasswordPage() {
           </>
         )}
 
-        <div className="mt-6 border-t border-slate-800 pt-6">
-          <Link href="/login" className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 px-5 py-3 font-semibold text-white transition hover:border-slate-500">
+        <div className="mt-6 border-t border-[#E7E0E3] pt-6">
+          <Link href="/login" className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] px-5 py-3 font-semibold text-[#2D1B36] transition hover:bg-[#F2ECF3]">
             Back to sign in
           </Link>
         </div>

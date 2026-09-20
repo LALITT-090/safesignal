@@ -97,61 +97,61 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
-      <div className="mx-auto max-w-md rounded-3xl border border-slate-800 bg-slate-900 p-8 shadow-2xl">
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">SafeSignal</p>
-        <h1 className="mt-3 text-3xl font-bold">Authority sign in</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-400">
-          Authorized access is required for dashboards, review tools and exact internal location data.
+    <main className="min-h-screen bg-[#FAF8F5] px-6 py-16 text-[#3B3540]">
+      <div className="mx-auto max-w-md rounded-[22px] border border-[#E7E0E3] bg-[#FFFFFF] p-8 shadow-[0_18px_32px_rgba(67,42,82,0.06)]">
+        <p className="text-[11px] font-extrabold uppercase tracking-[0.22em] text-[#432A52]">SafeSignal</p>
+        <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">Authority access</h1>
+        <p className="mt-3 text-sm leading-6 text-[#5E5967]">
+          Sign in to continue to the SafeSignal authority workspace.
         </p>
 
         {sessionChecking ? (
-          <div className="mt-8 rounded-xl border border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-400">
+          <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-4 text-sm text-[#5E5967]">
             Checking your session...
           </div>
         ) : (
-        <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-          <div>
-            <label htmlFor="email" className="mb-2 block text-sm font-medium">Email</label>
-            <input
-              id="email"
-              type="email"
-              autoComplete="username"
-              required
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
-            />
-          </div>
-          <div>
-            <label htmlFor="password" className="mb-2 block text-sm font-medium">Password</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            <div>
+              <label htmlFor="email" className="mb-2 block text-sm font-bold text-[#2D1B36]">Email</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="min-h-12 w-full rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] px-4 py-3 text-[#3B3540] outline-none transition focus:border-[#432A52]"
+              />
+            </div>
+            <div>
+              <label htmlFor="password" className="mb-2 block text-sm font-bold text-[#2D1B36]">Password</label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="min-h-12 w-full rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] px-4 py-3 text-[#3B3540] outline-none transition focus:border-[#432A52]"
+              />
+            </div>
 
-          {error && <p role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</p>}
+            {error && <p role="alert" className="rounded-xl border border-[#E7E0E3] bg-[#FFF9F8] p-4 text-sm text-[#B94A48]">{error}</p>}
 
-          <div className="flex items-center justify-end">
-            <Link href="/reset-password" className="text-sm font-medium text-emerald-400 transition hover:text-emerald-300">
-              Forgot password?
-            </Link>
-          </div>
+            <div className="flex items-center justify-end">
+              <Link href="/reset-password" className="text-sm font-semibold text-[#432A52] transition hover:text-[#2D1B36]">
+                Forgot password?
+              </Link>
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="min-h-12 w-full rounded-xl bg-emerald-500 px-5 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+            <button
+              type="submit"
+              disabled={loading}
+              className="min-h-12 w-full rounded-xl bg-[#432A52] px-5 py-3 font-semibold text-[#FFFFFF] transition hover:bg-[#5F3E66] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Signing in..." : "Sign in"}
+            </button>
+          </form>
         )}
       </div>
     </main>

@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import {
+  analyzePersistedReportsAndCreateAlerts,
+} from "../../../lib/alerts";
 import { createSupabaseServerClient } from "../../../lib/supabase/server";
 import { isAuthorityUser } from "../../../lib/supabase/authority";
 
@@ -55,7 +58,6 @@ function normalizeCoordinate(value, minimum, maximum) {
 
 export async function GET(request) {
   try {
-    const supabase = getSupabaseAdmin();
     const { searchParams } = new URL(request.url);
     const reportId = normalizeText(searchParams.get("report_id") || "");
     const includeCoordinates = searchParams.get("view") === "authority";
@@ -75,37 +77,15 @@ export async function GET(request) {
       }
     }
 
-    let query = supabase
-      .from("reports")
-      .select(
-        includeCoordinates
-          ? "id, report_id, category, description, location_name, location_label, latitude, longitude, incident_time, status, review_notes, reviewed_by, reviewed_at"
-          : "id, report_id, category, description, location_name, location_label, incident_time, status"
-      )
-      .order("incident_time", {
-        ascending: false,
-      });
-
-    if (reportId) {
-      query = query.eq("report_id", reportId.toUpperCase());
-    }
-
-    const { data, error } = reportId
-      ? await query.maybeSingle()
-      : await query;
-
-    if (error) {
-      return NextResponse.json(
-        {
-          error: "Unable to load the requested report.",
-        },
-        { status: 500 }
-      );
-    }
+    const analysisResult = await analyzePersistedReportsAndCreateAlerts({
+      reportId,
+      runAnalysis: includeCoordinates,
+      includeCoordinates,
+    });
 
     return NextResponse.json({
-      report: reportId ? data ?? null : null,
-      reports: reportId ? (data ? [data] : []) : data ?? [],
+      report: analysisResult.report,
+      reports: analysisResult.reports,
     });
   } catch (error) {
     return NextResponse.json(
@@ -126,6 +106,7 @@ export async function POST(request) {
     const category = normalizeText(body.category || "");
     const description = normalizeText(body.description || "");
     const otherDetail = normalizeText(body.other_category_details || "");
+    const anonymousToken = normalizeText(body.anonymousToken || body.anonymous_token || "");
     const resolvedCategory = category || "Other";
 
     const incomingLocation = normalizeText(
@@ -158,6 +139,7 @@ export async function POST(request) {
       latitude,
       longitude,
       incident_time: incidentTime,
+      ...(anonymousToken ? { anonymous_token: anonymousToken } : {}),
     };
 
     const supabase = getSupabaseAdmin();
@@ -174,6 +156,12 @@ export async function POST(request) {
         },
         { status: 500 }
       );
+    }
+
+    try {
+      await analyzePersistedReportsAndCreateAlerts({ runAnalysis: true });
+    } catch (error) {
+      console.error("Authority alert analysis failed after report submission.", error);
     }
 
     return NextResponse.json(

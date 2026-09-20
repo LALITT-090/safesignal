@@ -23,12 +23,6 @@ export default function AuthorityMapPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  async function handleSignOut() {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
-
   useEffect(() => {
     async function loadReports() {
       const supabase = createSupabaseBrowserClient();
@@ -128,8 +122,8 @@ export default function AuthorityMapPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 text-white">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-8 py-6 text-slate-400">
+      <main className="flex min-h-screen items-center justify-center bg-[#FAF8F5] text-[#3B3540]">
+        <div className="rounded-2xl border border-[#E7E0E3] bg-white px-8 py-6 text-[#5E5967]">
           Loading authority map from SafeSignal...
         </div>
       </main>
@@ -138,70 +132,37 @@ export default function AuthorityMapPage() {
 
   if (error) {
     return (
-      <main className="min-h-screen bg-slate-950 p-8 text-white">
-        <div className="mx-auto max-w-4xl rounded-2xl border border-red-500/30 bg-red-500/10 p-8">
-          <h1 className="text-xl font-bold text-red-300">Unable to load authority map</h1>
-          <p className="mt-3 text-red-200">{error}</p>
+      <main className="min-h-screen bg-[#FAF8F5] p-8 text-[#3B3540]">
+        <div className="mx-auto max-w-4xl rounded-2xl border border-[#E7E0E3] bg-[#FFF9F8] p-8">
+          <h1 className="text-xl font-bold text-[#B94A48]">Unable to load authority map</h1>
+          <p className="mt-3 text-[#7D5F6E]">{error}</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 bg-slate-900">
-        <div className="mx-auto flex max-w-[1500px] flex-col gap-5 px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-400">
-              SafeSignal / Authority Map
-            </p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
-              Understand the signal geographically
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-400">
-              Live geographic visualization of connected anonymous safety reports for human review.
-            </p>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <a
-              href="/dashboard"
-              className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-700 px-5 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-emerald-500/50 hover:bg-slate-800"
-            >
-              <span aria-hidden="true">←</span>
-              Back to Dashboard
-            </a>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-full border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
-            >
-              Sign out
-            </button>
-          </div>
-        </div>
-      </header>
-
+    <main className="min-h-screen bg-[#FAF8F5] text-[#3B3540]">
       <div className="mx-auto grid max-w-[1500px] gap-5 px-5 py-5 sm:px-8 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-6 lg:py-8">
-        <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-black/20">
-          <div className="flex flex-col gap-3 border-b border-slate-800 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <section className="min-w-0 overflow-hidden rounded-2xl border border-[#E7E0E3] bg-white shadow-[0_18px_32px_rgba(67,42,82,0.04)]">
+          <div className="flex flex-col gap-3 border-b border-[#E7E0E3] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#432A52]">
                 Report cluster
               </p>
-              <h2 className="mt-1 text-xl font-bold">
+              <h2 className="mt-1 text-xl font-bold text-[#2D1B36]">
                 {primaryPattern?.label || (reports.length > 0 ? "All Reports" : "No Reports")}
               </h2>
             </div>
-            <div className="flex items-center gap-2 text-sm text-slate-400">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
+            <div className="flex items-center gap-2 text-sm text-[#5E5967]">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#3F7D63] shadow-[0_0_12px_rgba(63,125,99,0.4)]" />
               {relatedReports.length > 0
                 ? `${relatedReports.length} connected reports`
                 : `${reports.length} total reports`}
             </div>
           </div>
 
-          <div className="h-[clamp(360px,48vh,560px)] w-full bg-[#10211f]">
+          <div className="h-[clamp(360px,48vh,560px)] w-full bg-[#F4F0ED]">
             <MapView
               reports={reports}
               primaryClusterReportIds={primaryClusterReportIds}
@@ -210,42 +171,42 @@ export default function AuthorityMapPage() {
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-slate-800 px-5 py-4 text-xs text-slate-400 sm:px-6">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-[#E7E0E3] px-5 py-4 text-xs text-[#5E5967] sm:px-6">
             <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#3F7D63]" />
               Related report
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-slate-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#9E9AA3]" />
               Independent report
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-400" />
+              <span className="h-2.5 w-2.5 rounded-full bg-[#C58A32]" />
               Focus location
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-2.5 w-5 rounded-full border border-dashed border-amber-400" />
+              <span className="h-2.5 w-5 rounded-full border border-dashed border-[#C58A32]" />
               Highlighted area
             </span>
           </div>
         </section>
 
         <aside className="space-y-5">
-          <section className="rounded-2xl border border-amber-500/30 bg-slate-900 p-5 shadow-xl shadow-black/10 sm:p-6">
+          <section className="rounded-2xl border border-[#E7E0E3] bg-white p-5 shadow-[0_18px_32px_rgba(67,42,82,0.04)] sm:p-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#C58A32]">
                   Emerging pattern
                 </p>
-                <h2 className="mt-2 text-2xl font-bold">
+                <h2 className="mt-2 text-2xl font-bold text-[#2D1B36]">
                   {primaryPattern?.label || "No active pattern"}
                 </h2>
               </div>
               <span
                 className={`rounded-full border px-3 py-1 text-xs font-bold tracking-wider ${
                   isRising
-                    ? "border-amber-400/30 bg-amber-400/10 text-amber-300"
-                    : "border-slate-700 bg-slate-800 text-slate-400"
+                    ? "border-[#F3D79E] bg-[#FFF7E8] text-[#C58A32]"
+                    : "border-[#E7E0E3] bg-[#FAF8F5] text-[#5E5967]"
                 }`}
               >
                 {isRising ? "RISING" : "MONITORING"}
@@ -267,11 +228,11 @@ export default function AuthorityMapPage() {
               <Metric label="Previous Activity" value={`${previousCount} reports`} />
             </div>
 
-            <div className="mt-5 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-400">
+            <div className="mt-5 rounded-xl border border-[#F0D9A1] bg-[#FFF7E8] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#C58A32]">
                 Review message
               </p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
+              <p className="mt-2 text-sm leading-6 text-[#5E5967]">
                 {primaryPattern
                   ? "Possible emerging pattern — human review recommended."
                   : "No emerging pattern currently detected in geographic reports."}
@@ -279,9 +240,9 @@ export default function AuthorityMapPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6">
-            <h2 className="text-lg font-bold">Why this area is connected</h2>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
+          <section className="rounded-2xl border border-[#E7E0E3] bg-white p-5 sm:p-6">
+            <h2 className="text-lg font-bold text-[#2D1B36]">Why this area is connected</h2>
+            <p className="mt-3 text-sm leading-6 text-[#5E5967]">
               SafeSignal connects reports using consistent location, timing, behaviour, and incident category signals.
             </p>
 
@@ -289,12 +250,12 @@ export default function AuthorityMapPage() {
               {signalDetails.map((signal) => (
                 <div key={signal.label}>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">{signal.label}</span>
-                    <span className="font-semibold text-slate-200">{signal.value}</span>
+                    <span className="text-[#5E5967]">{signal.label}</span>
+                    <span className="font-semibold text-[#2D1B36]">{signal.value}</span>
                   </div>
-                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-800">
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E7E0E3]">
                     <div
-                      className="h-full rounded-full bg-emerald-400"
+                      className="h-full rounded-full bg-[#3F7D63]"
                       style={{ width: signal.value }}
                     />
                   </div>
@@ -303,9 +264,9 @@ export default function AuthorityMapPage() {
             </div>
           </section>
 
-          <section className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 sm:p-6">
-            <p className="text-sm font-semibold text-amber-400">Review boundary</p>
-            <p className="mt-2 text-sm leading-6 text-slate-400">
+          <section className="rounded-2xl border border-[#F0D9A1] bg-[#FFF7E8] p-5 sm:p-6">
+            <p className="text-sm font-semibold text-[#C58A32]">Review boundary</p>
+            <p className="mt-2 text-sm leading-6 text-[#5E5967]">
               This is a review signal, not a determination of truth, guilt, identity, or responsibility.
             </p>
           </section>
@@ -325,14 +286,14 @@ function Metric({
   accent?: "default" | "emerald" | "amber";
 }) {
   const valueColor = {
-    default: "text-white",
-    emerald: "text-emerald-400",
-    amber: "text-amber-400",
+    default: "text-[#2D1B36]",
+    emerald: "text-[#3F7D63]",
+    amber: "text-[#C58A32]",
   }[accent];
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-4">
-      <p className="text-xs leading-5 text-slate-500">{label}</p>
+    <div className="rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] p-4">
+      <p className="text-xs leading-5 text-[#5E5967]">{label}</p>
       <p className={`mt-2 text-xl font-bold ${valueColor}`}>{value}</p>
     </div>
   );

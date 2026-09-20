@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { getAnonymousToken } from "../../lib/anonymous-token";
 import LocationPicker, { LocationSelection } from "./location-picker";
 
 const categories = [
@@ -87,6 +88,8 @@ export default function ReportPage() {
       .filter(Boolean)
       .join("\n\n");
 
+    const anonymousToken = getAnonymousToken();
+
     const payload = {
       category,
       location_name: locationSelection?.label || "Location unavailable",
@@ -95,6 +98,7 @@ export default function ReportPage() {
       longitude: locationSelection?.longitude ?? null,
       incident_time: incidentTime,
       description: combinedDescription || "",
+      anonymousToken,
     };
 
     try {
@@ -162,83 +166,87 @@ export default function ReportPage() {
 
   if (reportId) {
     return (
-      <main className="min-h-screen bg-slate-950 px-6 py-16 text-white">
-        <div className="mx-auto max-w-xl rounded-3xl border border-slate-800 bg-slate-900 p-8 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/10 text-3xl">✓</div>
-          <h1 className="mt-6 text-3xl font-bold">Report submitted anonymously</h1>
-          <p className="mt-3 text-slate-400">You can add more details later.</p>
+      <main className="bg-[#FAF8F5] px-4 py-12 text-[#3B3540] md:px-6">
+        <div className="page-shell max-w-xl">
+          <div className="safe-card-strong p-8 text-center">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#F2ECF3] text-3xl text-[#432A52]">✓</div>
+            <h1 className="mt-6 text-3xl font-extrabold tracking-[-0.03em] text-[#2D1B36]">Report submitted anonymously</h1>
+            <p className="mt-3 text-[#5E5967]">You can add more details later.</p>
 
-          <div className="mt-8 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-6">
-            <p className="text-sm text-slate-400">Report ID</p>
-            <p className="mt-2 text-3xl font-bold tracking-widest text-emerald-400">{reportId}</p>
-          </div>
-
-          <div className="mt-6 space-y-3 text-left text-sm text-slate-400">
-            <p>📍 {locationSelection?.label || "Location selected"}</p>
-            <p>🕒 {timeChoice === "current" ? "Current time used" : "Selected time recorded"}</p>
-            <p>🕐 Submitted: {submittedAt}</p>
-          </div>
-
-          {showAddDetails ? (
-            <div className="mt-8 rounded-2xl border border-slate-700 bg-slate-950 p-5 text-left">
-              <label className="mb-2 block text-sm font-medium text-white">Additional description</label>
-              <textarea
-                value={detailDraft}
-                onChange={(event) => setDetailDraft(event.target.value)}
-                placeholder="Describe what happened, what you noticed, or any other useful detail..."
-                rows={5}
-                className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
-              />
-              {detailError && <p className="mt-3 text-sm text-red-300">{detailError}</p>}
-              <button
-                type="button"
-                onClick={handleSaveDetails}
-                disabled={isSavingDetails}
-                className="mt-4 min-h-12 w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isSavingDetails ? "Saving..." : "Save Description"}
-              </button>
+            <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-6">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#432A52]">Report ID</p>
+              <p className="mt-2 text-3xl font-extrabold tracking-[0.18em] text-[#432A52]">{reportId}</p>
             </div>
-          ) : (
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => setShowAddDetails(true)}
-                className="min-h-12 flex-1 rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400"
-              >
-                Add details later
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push(`/report/status/${reportId}`)}
-                className="min-h-12 flex-1 rounded-xl border border-slate-700 px-6 py-3 font-semibold transition hover:bg-slate-800"
-              >
-                Continue
-              </button>
+
+            <div className="mt-6 space-y-3 text-left text-sm text-[#5E5967]">
+              <p>📍 {locationSelection?.label || "Location selected"}</p>
+              <p>🕒 {timeChoice === "current" ? "Current time used" : "Selected time recorded"}</p>
+              <p>🕐 Submitted: {submittedAt}</p>
             </div>
-          )}
+
+            {showAddDetails ? (
+              <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-white p-5 text-left">
+                <label className="mb-2 block text-sm font-bold text-[#2D1B36]">Additional description</label>
+                <textarea
+                  value={detailDraft}
+                  onChange={(event) => setDetailDraft(event.target.value)}
+                  placeholder="Describe what happened, what you noticed, or any other useful detail..."
+                  rows={5}
+                  className="input-shell resize-none"
+                />
+                {detailError && <p className="mt-3 text-sm text-[#B91C1C]">{detailError}</p>}
+                <button
+                  type="button"
+                  onClick={handleSaveDetails}
+                  disabled={isSavingDetails}
+                  className="primary-btn mt-4 w-full"
+                >
+                  {isSavingDetails ? "Saving..." : "Save Description"}
+                </button>
+              </div>
+            ) : (
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setShowAddDetails(true)}
+                  className="secondary-btn flex-1"
+                >
+                  Add details later
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push(`/report/status/${reportId}`)}
+                  className="primary-btn flex-1"
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-8 text-white sm:px-6 sm:py-12">
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-8 sm:mb-10">
-          <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">SafeSignal</p>
-          <h1 className="mt-3 text-4xl font-bold">Report an incident</h1>
-          <p className="mt-3 text-slate-400">Reports are anonymous. Share only what feels safe to share.</p>
+    <main className="bg-[#FAF8F5] px-4 py-10 text-[#3B3540] md:px-6 md:py-14">
+      <div className="page-shell max-w-3xl">
+        <div className="mb-8">
+          <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#432A52]">SafeSignal</p>
+          <h1 className="mt-3 text-4xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">Report an incident</h1>
+          <p className="mt-3 max-w-xl text-base leading-7 text-[#5E5967]">
+            Your report is anonymous. You do not need to provide your name or contact details.
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 rounded-3xl border border-slate-800 bg-slate-900 p-5 sm:p-8">
-          <div>
-            <label className="mb-2 block text-sm font-medium" htmlFor="category">What happened?</label>
+        <form onSubmit={handleSubmit} className="safe-card-strong space-y-6 p-5 sm:p-8">
+          <div className="space-y-2">
+            <label className="block text-sm font-bold text-[#2D1B36]" htmlFor="category">What happened?</label>
             <select
               id="category"
               value={category}
               onChange={(event) => setCategory(event.target.value)}
-              className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500"
+              className="input-shell"
             >
               <option value="">Select a category</option>
               {categories.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -246,78 +254,78 @@ export default function ReportPage() {
 
             {category === "Other" && (
               <div className="mt-3">
-                <label className="mb-2 block text-sm font-medium text-slate-200" htmlFor="other-category">Tell us what happened</label>
+                <label className="mb-2 block text-sm font-bold text-[#2F3273]" htmlFor="other-category">Tell us what happened</label>
                 <input
                   id="other-category"
                   value={otherCategoryDetail}
                   onChange={(event) => setOtherCategoryDetail(event.target.value)}
                   placeholder="Describe the incident type"
-                  className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
+                  className="input-shell"
                 />
               </div>
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 sm:p-5">
+          <div className="rounded-2xl border border-[#E7E0E3] bg-white p-4 sm:p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium">Location</p>
-                <p className="mt-1 text-sm text-slate-400">Choose where the incident happened.</p>
+                <p className="text-sm font-bold text-[#2D1B36]">Where did it happen?</p>
+                <p className="mt-1 text-sm text-[#5E5967]">Choose the place most associated with the incident.</p>
               </div>
-              <span className="text-xl" aria-hidden="true">⌖</span>
+              <span className="text-xl text-[#432A52]" aria-hidden="true">⌖</span>
             </div>
 
             {locationSelection ? (
-              <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300">Selected location</p>
-                  <p className="mt-1 font-semibold text-white">{locationSelection.label}</p>
-                  {locationSelection.accuracy !== null && <p className="mt-1 text-xs text-slate-300">Accuracy approximately {Math.round(locationSelection.accuracy)} m</p>}
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#432A52]">Selected location</p>
+                  <p className="mt-1 font-bold text-[#2D1B36]">{locationSelection.label}</p>
+                  {locationSelection.accuracy !== null && <p className="mt-1 text-xs text-[#5E5967]">Accuracy approximately {Math.round(locationSelection.accuracy)} m</p>}
                 </div>
-                <button type="button" onClick={() => setLocationPickerOpen(true)} className="min-h-11 rounded-xl border border-emerald-400/40 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/15">Change</button>
+                <button type="button" onClick={() => setLocationPickerOpen(true)} className="secondary-btn min-h-[44px]">Change</button>
               </div>
             ) : (
-              <button type="button" onClick={() => setLocationPickerOpen(true)} className="mt-4 flex min-h-14 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-900 px-4 text-left font-semibold text-slate-200 transition hover:border-emerald-500/60 hover:bg-slate-800">
+              <button type="button" onClick={() => setLocationPickerOpen(true)} className="mt-4 flex min-h-14 w-full items-center justify-between rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] px-4 text-left font-bold text-[#2D1B36] transition hover:bg-[#F2ECF3]">
                 <span>Select location</span>
-                <span className="text-slate-400" aria-hidden="true">→</span>
+                <span className="text-[#432A52]" aria-hidden="true">→</span>
               </button>
             )}
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 sm:p-5">
-            <p className="text-sm font-medium">Time</p>
+          <div className="rounded-2xl border border-[#E7E0E3] bg-white p-4 sm:p-5">
+            <p className="text-sm font-bold text-[#2D1B36]">When did it happen?</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              <label className="flex min-h-12 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 p-3">
+              <label className="flex min-h-12 items-center gap-2 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-3 text-[#2D1B36]">
                 <input type="radio" checked={timeChoice === "current"} onChange={() => setTimeChoice("current")} name="timeChoice" />
                 <span>Use current time</span>
               </label>
-              <label className="flex min-h-12 items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 p-3">
+              <label className="flex min-h-12 items-center gap-2 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-3 text-[#2D1B36]">
                 <input type="radio" checked={timeChoice === "custom"} onChange={() => setTimeChoice("custom")} name="timeChoice" />
                 <span>Select date &amp; time</span>
               </label>
             </div>
-            {timeChoice === "custom" && <input type="datetime-local" value={selectedDateTime} onChange={(event) => setSelectedDateTime(event.target.value)} className="mt-4 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none focus:border-emerald-500" />}
+            {timeChoice === "custom" && <input type="datetime-local" value={selectedDateTime} onChange={(event) => setSelectedDateTime(event.target.value)} className="input-shell mt-4" />}
           </div>
 
           <div>
-            <label className="mb-2 block text-sm font-medium" htmlFor="description">Description (optional)</label>
+            <label className="mb-2 block text-sm font-bold text-[#2D1B36]" htmlFor="description">Optional description</label>
             <textarea
               id="description"
               value={description}
               onChange={(event) => setDescription(event.target.value)}
               placeholder="Tell us what happened, if you feel comfortable..."
               rows={5}
-              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
+              className="input-shell resize-none"
             />
-            <p className="mt-2 text-xs text-slate-400">You can submit now and add details later.</p>
+            <p className="mt-2 text-xs text-[#5E5967]">You can submit now and add details later.</p>
           </div>
 
-          {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>}
+          {error && <div className="rounded-2xl border border-[#E7E0E3] bg-[#FDF4F4] p-4 text-sm text-[#B94A48]">{error}</div>}
 
-          <button type="submit" disabled={loading} className="min-h-12 w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60">
-            {loading ? "Submitting..." : "Submit anonymously"}
+          <button type="submit" disabled={loading} className="primary-btn w-full">
+            {loading ? "Submitting..." : "Submit Anonymously"}
           </button>
-          <p className="text-center text-sm text-slate-400">No name, phone number or email is required.</p>
+          <p className="text-center text-sm text-[#5E5967]">No name, phone number or email is required.</p>
         </form>
       </div>
 

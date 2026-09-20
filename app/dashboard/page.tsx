@@ -1,9 +1,7 @@
 ﻿"use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { buildPatternClusters } from "../../lib/pattern-engine";
-import { createSupabaseBrowserClient } from "../../lib/supabase/browser";
 
 type Report = {
   id: string;
@@ -18,16 +16,9 @@ type Report = {
 };
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  async function handleSignOut() {
-    const supabase = createSupabaseBrowserClient();
-    await supabase.auth.signOut();
-    router.push("/login");
-  }
 
   useEffect(() => {
     async function loadReports() {
@@ -74,77 +65,67 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-        <div className="rounded-2xl border border-slate-800 bg-slate-900 px-8 py-6 text-slate-400">
-          Loading reports from SafeSignal...
-        </div>
+      <main className="flex min-h-screen items-center justify-center bg-[#FAF8F5] text-[#3B3540]">
+        <div className="safe-card px-8 py-6 text-[#5E5967]">Loading reports from SafeSignal...</div>
       </main>
     );
   }
 
   if (error) {
     return (
-      <main className="min-h-screen bg-slate-950 text-white p-8">
-        <div className="mx-auto max-w-4xl rounded-2xl border border-red-500/30 bg-red-500/10 p-8">
-          <h1 className="text-xl font-bold text-red-300">Unable to load reports</h1>
-          <p className="mt-3 text-red-200">{error}</p>
+      <main className="bg-[#FAF8F5] p-8 text-[#3B3540]">
+        <div className="page-shell max-w-2xl rounded-3xl border border-[#E7E0E3] bg-[#FFF9F8] p-8">
+          <h1 className="text-xl font-extrabold text-[#B94A48]">Unable to load reports</h1>
+          <p className="mt-3 text-[#7D5F6E]">{error}</p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 bg-slate-900">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
+    <main className="bg-[#FAF8F5] py-10 text-[#3B3540] md:py-12">
+      <div className="page-shell">
+        <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-emerald-400">SafeSignal</p>
-            <h1 className="mt-1 text-3xl font-bold">Authority Dashboard</h1>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#432A52]">Authority dashboard</p>
+            <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">SafeSignal overview</h1>
           </div>
-
-          <div className="flex items-center gap-3">
-            <div className="rounded-full border border-slate-700 px-5 py-2 text-sm text-slate-300">Operations</div>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              className="rounded-full border border-slate-700 px-4 py-2 text-sm text-slate-200 transition hover:bg-slate-800"
-            >
-              Sign out
-            </button>
+          <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E0E3] bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#432A52]">
+            {primaryPattern ? "Human review active" : "Monitoring mode"}
           </div>
         </div>
-      </header>
 
-      <div className="mx-auto max-w-7xl px-6 py-8">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Total Reports" value={String(reports.length)} />
-          <MetricCard label="Related Cluster" value={String(relatedReports.length)} accent="emerald" />
-          <MetricCard label="Safety Activity" value={safetyActivity} accent={safetyActivity === "Rising" ? "amber" : "default"} />
-          <MetricCard label="Review Status" value={reviewStatus} accent={reviewStatus === "Review" ? "red" : "default"} />
+          <MetricCard label="Reports" value={String(reports.length)} />
+          <MetricCard label="Independent reporter signals" value={String(primaryPattern?.reporterDiversity ?? 0)} accent="emerald" />
+          <MetricCard label="Activity change" value={primaryPattern ? `+${risingPercent}%` : "0%"} accent={safetyActivity === "Rising" ? "amber" : "default"} />
+          <MetricCard label="Patterns requiring review" value={primaryPattern ? "1" : "0"} accent={reviewStatus === "Review" ? "red" : "default"} />
         </div>
 
-        <section className="mt-8 rounded-3xl border border-amber-500/40 bg-slate-900 p-7">
-          <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-            <div>
+        <section className="mt-8 safe-card-strong p-7 md:p-8">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl">
               <div className="flex flex-wrap gap-3">
-                <span className="rounded-full bg-amber-500/10 px-4 py-2 text-xs font-bold uppercase tracking-wide text-amber-400">Emerging Pattern</span>
-                <span className={`rounded-full px-4 py-2 text-xs font-bold uppercase tracking-wide ${primaryPattern ? "bg-red-500/10 text-red-400" : "bg-slate-700 text-slate-300"}`}>
+                <span className="rounded-full bg-[#F7E8CC] px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#C58A32]">Emerging pattern</span>
+                <span className={`rounded-full px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.18em] ${primaryPattern ? "bg-[#F9E6E4] text-[#B94A48]" : "bg-[#F2ECF3] text-[#432A52]"}`}>
                   {primaryPattern ? safetyActivity : "Monitoring"}
                 </span>
               </div>
 
-              <h2 className="mt-5 text-3xl font-bold">{primaryPattern?.label || "No active pattern"}</h2>
+              <h2 className="mt-5 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36] md:text-4xl">
+                {primaryPattern?.label || "No active pattern"}
+              </h2>
 
-              <p className="mt-3 max-w-3xl text-slate-400">
+              <p className="mt-3 max-w-2xl text-base leading-7 text-[#5E5967]">
                 {primaryPattern
                   ? "SafeSignal has connected multiple anonymous submissions around the same local area and time window. The signal supports human review and does not determine guilt or identity."
                   : "No emerging reported safety pattern is currently strong enough to surface for human review."}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-700 bg-slate-950 px-8 py-5 text-center">
-              <p className="text-xs uppercase tracking-wide text-slate-500">Related Reports</p>
-              <p className="mt-2 text-4xl font-bold">{relatedReports.length}</p>
+            <div className="min-w-[180px] rounded-2xl border border-[#E7E0E3] bg-white p-5 text-center">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Related reports</p>
+              <p className="mt-2 text-4xl font-extrabold text-[#2D1B36]">{relatedReports.length}</p>
             </div>
           </div>
 
@@ -159,52 +140,54 @@ export default function DashboardPage() {
 
               <div className="mt-8">
                 <div className="mb-4">
-                  <h3 className="text-xl font-semibold">Why these reports were connected</h3>
-                  <p className="mt-1 text-sm text-slate-400">This pattern was assembled using location, timing, category and behavioural consistency.</p>
+                  <h3 className="text-xl font-extrabold text-[#2F3273]">Why these reports were connected</h3>
+                  <p className="mt-1 text-sm text-[#5C628F]">This pattern was assembled using location, timing, category and behavioural consistency.</p>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
                   {primaryPattern.connectionExplanation.map((explanation, index) => (
-                    <div key={`${explanation}-${index}`} className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
-                      <p className="text-sm text-slate-400">{index === 0 ? "Location" : index === 1 ? "Time" : index === 2 ? "Category" : index === 3 ? "Behaviour" : "Reporter diversity"}</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-200">{explanation}</p>
+                    <div key={`${explanation}-${index}`} className="rounded-2xl border border-[#E7E0E3] bg-white p-5">
+                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#432A52]">
+                        {index === 0 ? "Location" : index === 1 ? "Time" : index === 2 ? "Category" : index === 3 ? "Behaviour" : "Reporter diversity"}
+                      </p>
+                      <p className="mt-2 text-sm leading-6 text-[#5E5967]">{explanation}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900 p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-200">Reporter diversity</p>
-                    <p className="mt-1 text-sm text-slate-400">Multiple anonymous submissions contribute to this pattern.</p>
-                  </div>
-                  <div className="sm:text-right">
-                    <p className="text-3xl font-bold text-emerald-400">{primaryPattern.reporterDiversity}</p>
-                    <p className="text-xs text-slate-500">unique anonymous submissions</p>
+                <div className="rounded-2xl border border-[#E7E0E3] bg-white p-5">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-bold text-[#2D1B36]">Reporter diversity</p>
+                      <p className="mt-1 text-sm text-[#5E5967]">Multiple anonymous submissions contribute to this pattern.</p>
+                    </div>
+                    <div className="sm:text-right">
+                      <p className="text-3xl font-extrabold text-[#432A52]">{primaryPattern.reporterDiversity}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5E5967]">Unique reports</p>
                   </div>
                 </div>
               </div>
 
-              <div className={`mt-6 rounded-2xl border p-6 ${primaryPattern.suspicious ? "border-amber-500/30 bg-amber-500/5" : "border-slate-800 bg-slate-900"}`}>
+              <div className={`mt-6 rounded-2xl border p-6 ${primaryPattern.suspicious ? "border-[#F2D496] bg-[#FFF7E8]" : "border-[#E7E0E3] bg-white"}`}>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className={`font-semibold ${primaryPattern.suspicious ? "text-amber-300" : "text-emerald-300"}`}>Reporting behaviour</p>
-                    <p className="mt-1 text-sm text-slate-400">{reportingBehaviourMessage}</p>
+                    <p className={`font-extrabold ${primaryPattern.suspicious ? "text-[#C58A32]" : "text-[#3F7D63]"}`}>Reporting behaviour</p>
+                    <p className="mt-1 text-sm leading-6 text-[#5E5967]">{reportingBehaviourMessage}</p>
                   </div>
                   <div className="text-left sm:text-right">
-                    <p className="text-xs uppercase tracking-wider text-slate-500">Status</p>
-                    <p className={`mt-1 text-2xl font-bold ${primaryPattern.suspicious ? "text-amber-300" : "text-emerald-300"}`}>{reportingBehaviourStatus}</p>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Status</p>
+                    <p className={`mt-1 text-2xl font-extrabold ${primaryPattern.suspicious ? "text-[#C58A32]" : "text-[#3F7D63]"}`}>{reportingBehaviourStatus}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6">
+              <div className="mt-6 rounded-2xl border border-[#C9E8D9] bg-[#EEF9F4] p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-semibold">Corroboration support</p>
-                    <p className="mt-1 text-sm text-slate-400">Support indicator based on consistency across related reports.</p>
+                    <p className="font-extrabold text-[#3F7D63]">Corroboration support</p>
+                    <p className="mt-1 text-sm text-[#5E5967]">Support indicator based on consistency across related reports.</p>
                   </div>
-                  <p className="text-4xl font-bold text-emerald-400">{corroborationScore}/100</p>
+                  <p className="text-4xl font-extrabold text-[#3F7D63]">{corroborationScore}/100</p>
                 </div>
               </div>
 
@@ -213,30 +196,30 @@ export default function DashboardPage() {
                 <InfoBlock label="Previous activity" value={String(previousCount)} description="Related reports in the previous 7-day window." />
               </div>
 
-              <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6">
+              <div className="mt-6 rounded-2xl border border-[#F9DF77] bg-[#FFF9DE] p-6">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="flex flex-wrap items-center gap-3">
-                      <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-amber-300">Rising reported safety activity</span>
-                      <span className="rounded-full bg-red-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-red-300">Support signal</span>
+                      <span className="rounded-full bg-[#FFF5C8] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#B45309]">Rising activity</span>
+                      <span className="rounded-full bg-[#FEE2E2] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#B91C1C]">Support signal</span>
                     </div>
-                    <h3 className="mt-4 text-xl font-semibold">Emerging activity at {primaryPattern.label}</h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Reported safety activity is higher than the previous comparison period. This is not evidence of guilt or perpetrator identity.</p>
+                    <h3 className="mt-4 text-xl font-extrabold text-[#2F3273]">Emerging activity at {primaryPattern.label}</h3>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5C628F]">Reported safety activity is higher than the previous comparison period. This is not evidence of guilt or perpetrator identity.</p>
                   </div>
-                  <div className="rounded-xl border border-amber-500/20 bg-slate-950 px-5 py-4 text-left sm:text-right">
-                    <p className="text-xs uppercase tracking-wider text-slate-500">Trend</p>
-                    <p className="mt-1 text-lg font-bold text-amber-300">+{risingPercent}%</p>
+                  <div className="rounded-xl border border-[#F6D35A] bg-white px-5 py-4 text-left sm:text-right">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Trend</p>
+                    <p className="mt-1 text-lg font-extrabold text-[#B45309]">+{risingPercent}%</p>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6">
-                <p className="font-semibold text-amber-300">Human review recommended</p>
-                <p className="mt-2 text-sm leading-6 text-slate-400">SafeSignal surfaces reported patterns for human review. It does not determine guilt, identify perpetrators, or automatically trigger enforcement.</p>
+              <div className="mt-6 rounded-2xl border border-[#E7E0E3] bg-white p-6">
+                <p className="font-extrabold text-[#2F3273]">Human review recommended</p>
+                <p className="mt-2 text-sm leading-6 text-[#5C628F]">SafeSignal surfaces reported patterns for human review. It does not determine guilt, identify perpetrators, or automatically trigger enforcement.</p>
               </div>
             </>
           ) : (
-            <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-950 p-6 text-slate-300">
+            <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-white p-6 text-[#5E5967]">
               No active pattern is currently strong enough to surface. The stream remains under monitoring.
             </div>
           )}
@@ -244,30 +227,30 @@ export default function DashboardPage() {
 
         <section className="mt-10">
           <div>
-            <h2 className="text-2xl font-bold">Recent Reports</h2>
-            <p className="mt-1 text-sm text-slate-400">Most recent anonymous submissions currently stored in SafeSignal.</p>
+            <h2 className="text-2xl font-extrabold text-[#2F3273]">Recent reports</h2>
+            <p className="mt-1 text-sm text-[#5C628F]">Most recent anonymous submissions currently stored in SafeSignal.</p>
           </div>
 
-          <div className="mt-5 overflow-hidden rounded-2xl border border-slate-800">
+          <div className="mt-5 overflow-hidden rounded-3xl border border-[#E7E0E3] bg-white shadow-[0_18px_32px_rgba(67,42,82,0.04)]">
             <div className="overflow-x-auto">
               <table className="min-w-full text-left">
-                <thead className="bg-slate-950">
-                  <tr className="border-b border-slate-800">
-                    <th className="px-5 py-4 text-sm font-semibold">Report ID</th>
-                    <th className="px-5 py-4 text-sm font-semibold">Category</th>
-                    <th className="px-5 py-4 text-sm font-semibold">Location</th>
-                    <th className="px-5 py-4 text-sm font-semibold">Description</th>
-                    <th className="px-5 py-4 text-sm font-semibold">Time</th>
+                <thead className="bg-[#FAF8F5]">
+                  <tr className="border-b border-[#E7E0E3]">
+                    <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Report ID</th>
+                    <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Category</th>
+                    <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Location</th>
+                    <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Description</th>
+                    <th className="px-5 py-4 text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Time</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentReports.map((report) => (
-                    <tr key={report.id} className="border-b border-slate-800 bg-slate-900">
-                      <td className="whitespace-nowrap px-5 py-4 text-sm font-medium text-emerald-400">{report.report_id}</td>
-                      <td className="whitespace-nowrap px-5 py-4 text-sm">{report.category || "Not provided"}</td>
-                      <td className="px-5 py-4 text-sm text-slate-300">{report.location_name || report.location_label || "Location unavailable"}</td>
-                      <td className="max-w-md px-5 py-4 text-sm text-slate-400">{report.description || "No description provided."}</td>
-                      <td className="whitespace-nowrap px-5 py-4 text-sm text-slate-500">{new Date(report.incident_time).toLocaleString()}</td>
+                    <tr key={report.id} className="border-b border-[#E7E0E3] bg-white last:border-b-0">
+                      <td className="whitespace-nowrap px-5 py-4 text-sm font-bold text-[#432A52]">{report.report_id}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-sm text-[#2F3273]">{report.category || "Not provided"}</td>
+                      <td className="px-5 py-4 text-sm text-[#5C628F]">{report.location_name || report.location_label || "Location unavailable"}</td>
+                      <td className="max-w-md px-5 py-4 text-sm text-[#5C628F]">{report.description || "No description provided."}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-sm text-[#5C628F]">{new Date(report.incident_time).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -275,12 +258,12 @@ export default function DashboardPage() {
             </div>
 
             {recentReports.length === 0 && (
-              <div className="p-10 text-center text-slate-500">No reports available.</div>
+              <div className="p-10 text-center text-[#5C628F]">No reports available.</div>
             )}
           </div>
         </section>
 
-        <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-5 text-sm leading-6 text-slate-500">
+        <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-white p-5 text-sm leading-7 text-[#5E5967]">
           SafeSignal connects anonymous reports using location, time, category and reported behaviour. Signals are surfaced for human review and do not identify perpetrators or determine guilt.
         </div>
       </div>
@@ -290,35 +273,35 @@ export default function DashboardPage() {
 
 function MetricCard({ label, value, accent = "default" }: { label: string; value: string; accent?: "default" | "emerald" | "amber" | "red" }) {
   const styles = {
-    default: "border-slate-800 bg-slate-900 text-white",
-    emerald: "border-emerald-500/30 bg-slate-900 text-emerald-400",
-    amber: "border-amber-500/30 bg-slate-900 text-amber-400",
-    red: "border-red-500/30 bg-slate-900 text-red-400",
+    default: "border-[#E7E0E3] bg-white text-[#2D1B36]",
+    emerald: "border-[#C7F9D9] bg-[#ECFDF5] text-[#15803d]",
+    amber: "border-[#F9DF77] bg-[#FFF9DE] text-[#B45309]",
+    red: "border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]",
   }[accent];
 
   return (
-    <div className={`rounded-2xl border p-6 ${styles}`}>
-      <p className="text-sm text-slate-400">{label}</p>
-      <p className="mt-2 text-4xl font-bold">{value}</p>
+    <div className={`metric-card p-5 ${styles}`}>
+      <h3 className="text-[11px] font-bold uppercase tracking-[0.16em]">{label}</h3>
+      <strong className="mt-3 block">{value}</strong>
     </div>
   );
 }
 
 function SignalTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl bg-slate-950 p-5">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold">{value}</p>
+    <div className="rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-5">
+      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#432A52]">{label}</p>
+      <p className="mt-2 text-3xl font-extrabold text-[#2F3273]">{value}</p>
     </div>
   );
 }
 
 function InfoBlock({ label, value, description }: { label: string; value: string; description: string }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-3xl font-bold">{value}</p>
-      <p className="mt-2 text-sm text-slate-400">{description}</p>
+    <div className="rounded-2xl border border-[#E7E0E3] bg-white p-6">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">{label}</p>
+      <p className="mt-2 text-3xl font-extrabold text-[#2F3273]">{value}</p>
+      <p className="mt-2 text-sm text-[#5C628F]">{description}</p>
     </div>
   );
 }

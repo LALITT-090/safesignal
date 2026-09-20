@@ -54,7 +54,7 @@ export default function LocationMap({
   }
 
   return (
-    <div className="h-full min-h-80 overflow-hidden rounded-2xl border border-slate-700 bg-slate-900">
+    <div className="h-full min-h-80 overflow-hidden rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5]">
       <MapContainer
         center={center}
         zoom={zoom}

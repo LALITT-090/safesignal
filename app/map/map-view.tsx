@@ -95,8 +95,8 @@ export default function MapView({
           />
           <ZoomControl position="bottomright" />
         </MapContainer>
-        <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-slate-950/70 p-6 text-center">
-          <div className="max-w-md rounded-2xl border border-slate-800 bg-slate-900/90 p-6 shadow-2xl">
+        <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-[#2D1B36]/35 p-6 text-center">
+          <div className="max-w-md rounded-2xl border border-[#E7E0E3] bg-[#FFFFFF]/95 p-6 shadow-[0_18px_32px_rgba(67,42,82,0.06)]">
             <p className="text-xs font-semibold uppercase tracking-wider text-amber-400">
               No Geographic Data
             </p>
@@ -171,7 +171,7 @@ export default function MapView({
               <div className="min-w-[220px]">
                 <div className="flex items-start justify-between gap-4 border-b border-slate-700 pb-3">
                   <div>
-                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-400">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#432A52]">
                       Anonymous report
                     </p>
                     <p className="mt-1 text-sm font-bold text-white">

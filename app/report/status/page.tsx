@@ -82,68 +82,68 @@ export default function ReportStatusPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <div className="mx-auto max-w-xl rounded-3xl border border-slate-800 bg-slate-900 p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">
-          SafeSignal
-        </p>
-        <h1 className="mt-3 text-3xl font-bold">Report status</h1>
+    <main className="bg-[#FAF8F5] px-4 py-12 text-[#3B3540] md:px-6">
+      <div className="page-shell max-w-2xl">
+        <div className="safe-card-strong p-8">
+          <p className="text-xs font-bold uppercase tracking-[0.26em] text-[#432A52]">SafeSignal</p>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">Report status</h1>
 
-        <form onSubmit={handleLookup} className="mt-6 space-y-4">
-          <label className="block text-sm font-medium">Your Report ID</label>
-          <input
-            value={reportId}
-            onChange={(event) => setReportId(event.target.value)}
-            placeholder="SS-XXXXXX"
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
-          />
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Checking..." : "Find Report"}
-          </button>
-
-          {lookupError && (
-            <p className="text-sm text-red-300">{lookupError}</p>
-          )}
-        </form>
-
-        {reportFound && (
-          <div className="mt-8 rounded-2xl border border-slate-700 bg-slate-950 p-5">
-            <label className="mb-2 block text-sm font-medium text-white">
-              Additional description
-            </label>
-            <textarea
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={6}
-              placeholder="Describe what happened, what you noticed, or any other useful detail..."
-              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
+          <form onSubmit={handleLookup} className="mt-6 space-y-4">
+            <label className="block text-sm font-bold text-[#2D1B36]">Your Report ID</label>
+            <input
+              value={reportId}
+              onChange={(event) => setReportId(event.target.value)}
+              placeholder="SS-XXXXXX"
+              className="input-shell"
             />
 
-            {saveError && (
-              <p className="mt-3 text-sm text-red-300">{saveError}</p>
-            )}
-
-            {saved && (
-              <p className="mt-3 text-sm text-emerald-300">
-                Description saved to your report.
-              </p>
-            )}
-
             <button
-              type="button"
-              onClick={handleSaveDescription}
+              type="submit"
               disabled={loading}
-              className="mt-4 w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
+              className="primary-btn w-full"
             >
-              {loading ? "Saving..." : "Save Description"}
+              {loading ? "Checking..." : "Find Report"}
             </button>
-          </div>
-        )}
+
+            {lookupError && (
+              <p className="text-sm text-[#B94A48]">{lookupError}</p>
+            )}
+          </form>
+
+          {reportFound && (
+            <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-5">
+              <label className="mb-2 block text-sm font-bold text-[#2D1B36]">
+                Additional description
+              </label>
+              <textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={6}
+                placeholder="Describe what happened, what you noticed, or any other useful detail..."
+                className="input-shell resize-none"
+              />
+
+              {saveError && (
+                <p className="mt-3 text-sm text-[#B94A48]">{saveError}</p>
+              )}
+
+              {saved && (
+                <p className="mt-3 text-sm text-[#3F7D63]">
+                  Description saved to your report.
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSaveDescription}
+                disabled={loading}
+                className="primary-btn mt-4 w-full"
+              >
+                {loading ? "Saving..." : "Save Description"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );

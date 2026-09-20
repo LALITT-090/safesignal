@@ -205,110 +205,112 @@ export default function DynamicReportStatusPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-6 py-12 text-white">
-      <div className="mx-auto max-w-2xl rounded-3xl border border-slate-800 bg-slate-900 p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.25em] text-emerald-400">SafeSignal</p>
-        <h1 className="mt-3 text-3xl font-bold">Report status</h1>
+    <main className="bg-[#FAF8F5] px-4 py-12 text-[#3B3540] md:px-6">
+      <div className="page-shell max-w-2xl">
+        <div className="safe-card-strong p-8">
+          <p className="text-xs font-bold uppercase tracking-[0.26em] text-[#432A52]">SafeSignal</p>
+          <h1 className="mt-3 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">Report status</h1>
 
-        <form onSubmit={handleLookup} className="mt-6 space-y-4">
-          <label htmlFor="report-id" className="block text-sm font-medium">Your Report ID</label>
-          <input
-            id="report-id"
-            value={reportId}
-            onChange={(event) => setReportId(event.target.value)}
-            placeholder="SS-XXXXXX"
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
-          />
+          <form onSubmit={handleLookup} className="mt-6 space-y-4">
+            <label htmlFor="report-id" className="block text-sm font-bold text-[#2D1B36]">Your Report ID</label>
+            <input
+              id="report-id"
+              value={reportId}
+              onChange={(event) => setReportId(event.target.value)}
+              placeholder="SS-XXXXXX"
+              className="input-shell"
+            />
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? "Checking..." : "Find Report"}
-          </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="primary-btn w-full"
+            >
+              {loading ? "Checking..." : "Find Report"}
+            </button>
 
-          {lookupError && <p role="alert" className="text-sm text-red-300">{lookupError}</p>}
-        </form>
+            {lookupError && <p role="alert" className="text-sm text-[#B94A48]">{lookupError}</p>}
+          </form>
 
-        {loading && !report && (
-          <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-950 p-4 text-sm text-slate-300">
-            Looking up your report...
-          </div>
-        )}
-
-        {report && (
-          <div className="mt-8 rounded-2xl border border-slate-700 bg-slate-950 p-5">
-            <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Report ID</p>
-                <p className="mt-2 text-2xl font-bold text-emerald-400">{report.report_id}</p>
-              </div>
-              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-emerald-300">
-                {currentStatusLabel}
-              </span>
+          {loading && !report && (
+            <div className="mt-6 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-4 text-sm text-[#5E5967]">
+              Looking up your report...
             </div>
+          )}
 
-            <dl className="mt-5 space-y-4 text-sm text-slate-300">
-              <div>
-                <dt className="text-slate-500">Status</dt>
-                <dd className="mt-1 font-medium text-white">{currentStatusLabel}</dd>
+          {report && (
+            <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-5">
+              <div className="flex items-center justify-between gap-3 border-b border-[#E7E0E3] pb-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#432A52]">Report ID</p>
+                  <p className="mt-2 text-2xl font-extrabold text-[#432A52]">{report.report_id}</p>
+                </div>
+                <span className="status-badge status-badge--medium">
+                  {currentStatusLabel}
+                </span>
               </div>
 
-              <div>
-                <dt className="text-slate-500">Category</dt>
-                <dd className="mt-1 font-medium text-white">{report.category || "Not provided"}</dd>
+              <dl className="mt-5 space-y-4 text-sm text-[#5E5967]">
+                <div>
+                  <dt className="text-[#432A52]">Status</dt>
+                  <dd className="mt-1 font-bold text-[#2D1B36]">{currentStatusLabel}</dd>
+                </div>
+
+                <div>
+                  <dt className="text-[#432A52]">Category</dt>
+                  <dd className="mt-1 font-bold text-[#2D1B36]">{report.category || "Not provided"}</dd>
+                </div>
+
+                <div>
+                  <dt className="text-[#432A52]">Location</dt>
+                  <dd className="mt-1 font-bold text-[#2D1B36]">
+                    {report.location_label || report.location_name || "Location unavailable"}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-[#432A52]">Submitted</dt>
+                  <dd className="mt-1 font-bold text-[#2D1B36]">
+                    {report.incident_time ? new Date(report.incident_time).toLocaleString() : "Not recorded"}
+                  </dd>
+                </div>
+
+                <div>
+                  <dt className="text-[#432A52]">Description</dt>
+                  <dd className="mt-1 whitespace-pre-wrap font-medium text-[#2D1B36]">
+                    {report.description || "No description has been added yet."}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-6 rounded-2xl border border-[#E7E0E3] bg-white p-4">
+                <label htmlFor="status-description" className="mb-2 block text-sm font-bold text-[#2D1B36]">
+                  Additional description
+                </label>
+                <textarea
+                  id="status-description"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={6}
+                  placeholder="Describe what happened, what you noticed, or any other useful detail..."
+                  className="input-shell resize-none"
+                />
+
+                {saveError && <p className="mt-3 text-sm text-[#B94A48]">{saveError}</p>}
+                {saved && <p className="mt-3 text-sm text-[#3F7D63]">Description saved to your report.</p>}
+
+                <button
+                  type="button"
+                  onClick={handleSaveDescription}
+                  disabled={saving}
+                  className="primary-btn mt-4 w-full"
+                >
+                  {saving ? "Saving..." : "Save Description"}
+                </button>
               </div>
-
-              <div>
-                <dt className="text-slate-500">Location</dt>
-                <dd className="mt-1 font-medium text-white">
-                  {report.location_label || report.location_name || "Location unavailable"}
-                </dd>
-              </div>
-
-              <div>
-                <dt className="text-slate-500">Submitted</dt>
-                <dd className="mt-1 font-medium text-white">
-                  {report.incident_time ? new Date(report.incident_time).toLocaleString() : "Not recorded"}
-                </dd>
-              </div>
-
-              <div>
-                <dt className="text-slate-500">Description</dt>
-                <dd className="mt-1 whitespace-pre-wrap text-white">
-                  {report.description || "No description has been added yet."}
-                </dd>
-              </div>
-            </dl>
-
-            <div className="mt-6 rounded-2xl border border-slate-700 bg-slate-900 p-4">
-              <label htmlFor="status-description" className="mb-2 block text-sm font-medium text-white">
-                Additional description
-              </label>
-              <textarea
-                id="status-description"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={6}
-                placeholder="Describe what happened, what you noticed, or any other useful detail..."
-                className="w-full resize-none rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-white outline-none placeholder:text-slate-600 focus:border-emerald-500"
-              />
-
-              {saveError && <p className="mt-3 text-sm text-red-300">{saveError}</p>}
-              {saved && <p className="mt-3 text-sm text-emerald-300">Description saved to your report.</p>}
-
-              <button
-                type="button"
-                onClick={handleSaveDescription}
-                disabled={saving}
-                className="mt-4 w-full rounded-xl bg-emerald-500 px-6 py-3 font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Saving..." : "Save Description"}
-              </button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </main>
   );
