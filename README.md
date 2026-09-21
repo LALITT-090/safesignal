@@ -5,7 +5,7 @@ SafeSignal is an anonymous community safety reporting application designed to he
 ## What it does
 
 - Anonymous incident reporting for safety concerns
-- Safety signal clustering based on location, time, category and behaviour
+- Safety signal pattern grouping based on location, time, category and behaviour
 - Authority dashboard for reviewing emerging patterns
 - Report lookup and later detail updates through a secure report ID flow
 - Geographic map view for connected incidents

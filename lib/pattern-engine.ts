@@ -1,4 +1,4 @@
-export { getAnonymousToken } from "./anonymous-token";
+export { getAnonymousToken } from "./anonymous-token.ts";
 
 export type IncidentType =
   | "harassment"
@@ -117,17 +117,11 @@ export type PatternCluster = {
   connectionExplanation: string[];
 };
 
-export type SpatialCandidateGroup = {
-  id: string;
-  reports: Report[];
-};
-
 export const LOCATION_RADIUS_METERS = 500;
 export const TIME_WINDOW_DAYS = 7;
-export const DBSCAN_EPSILON_METERS = 500;
-export const DBSCAN_MIN_POINTS = 2;
 export const MIN_UNIQUE_REPORTERS = 2;
 export const RISK_ALERT_THRESHOLD = 70;
+export const TREND_ALERT_THRESHOLD_PERCENT = 25;
 
 export const RELATED_INCIDENT_TYPES: Record<IncidentType, IncidentType[]> = {
   harassment: ["harassment", "inappropriate_behaviour", "following", "stalking"],
@@ -443,7 +437,9 @@ export function calculateTrend(reports: Report[]): TrendAnalysis {
     (report) => report.createdAt >= previousWindowStart && report.createdAt < currentWindowStart
   ).length;
 
-  const percentageChange = previousCount === 0 ? (currentCount > 0 ? 100 : 0) : ((currentCount - previousCount) / previousCount) * 100;
+  const percentageChange = previousCount === 0
+    ? (currentCount > 0 ? 100 : 0)
+    : ((currentCount - previousCount) / previousCount) * 100;
 
   return {
     currentCount,
@@ -453,6 +449,20 @@ export function calculateTrend(reports: Report[]): TrendAnalysis {
     currentWindowStart,
     previousWindowStart,
   };
+}
+
+export function shouldTriggerAuthorityAlert(
+  validation: Pick<ValidationResult, "valid" | "uniqueReporters" | "suspicious">,
+  risk: Pick<RiskScoreResult, "score">,
+  trend: Pick<TrendAnalysis, "percentageChange">
+) {
+  return (
+    validation.valid &&
+    validation.uniqueReporters >= MIN_UNIQUE_REPORTERS &&
+    !validation.suspicious &&
+    risk.score >= RISK_ALERT_THRESHOLD &&
+    trend.percentageChange >= TREND_ALERT_THRESHOLD_PERCENT
+  );
 }
 
 export function calculateRiskScore(patternGroup: PatternGroup, validation: ValidationResult, trend: TrendAnalysis): RiskScoreResult {
@@ -467,7 +477,7 @@ export function calculateRiskScore(patternGroup: PatternGroup, validation: Valid
       : 0;
 
   const locationScore = Math.max(0, Math.min(100, 100 - (averageDistance / LOCATION_RADIUS_METERS) * 100));
-  const timeScore = validation.timeSpreadHours <= 24 ? 90 : Math.max(20, 100 - (validation.timeSpreadHours / 72) * 100);
+  const timeScore = validation.timeSpreadHours <= 24 ? 90 : Math.max(50, 100 - (validation.timeSpreadHours / 72) * 100);
   const behaviourScores = [] as number[];
 
   for (let index = 0; index < patternGroup.reports.length; index += 1) {
@@ -560,8 +570,9 @@ export function analyzePatternGroup(patternGroup: PatternGroup, provider: Semant
 
     const requiresHumanReview = validation.valid || validation.suspicious;
     const severity: AuthorityAlert["severity"] = risk.score >= 85 ? "high" : "elevated";
+    const isAuthorityAlert = shouldTriggerAuthorityAlert(validation, risk, trend);
     const authorityAlert: AuthorityAlert | undefined =
-      risk.score >= RISK_ALERT_THRESHOLD && requiresHumanReview
+      isAuthorityAlert && requiresHumanReview
         ? {
             id: `AL-${hashString(normalizedGroup.id).slice(0, 6)}`,
             patternGroupId: normalizedGroup.id,
@@ -574,7 +585,7 @@ export function analyzePatternGroup(patternGroup: PatternGroup, provider: Semant
             categorySummary: [...new Set(normalizedGroup.reports.map((report) => report.incidentType))],
             generalLocation: `Area ${normalizedGroup.reports[0].latitude.toFixed(3)}, ${normalizedGroup.reports[0].longitude.toFixed(3)}`,
             explanation:
-              "Rising reported safety activity in a local area with related incident types and multiple independent reporter signals. This is not a determination of guilt or identity, and it requires human review.",
+              `Reported safety activity in this area has increased above the configured baseline threshold (${TREND_ALERT_THRESHOLD_PERCENT}%). Multiple independent reporter signals and related safety reports contributed to this pattern. Human review recommended.`,
             createdAt: new Date(),
             requiresHumanReview: true,
           }
@@ -590,75 +601,7 @@ export function analyzePatternGroup(patternGroup: PatternGroup, provider: Semant
   })();
 }
 
-export function dbscanSpatialCandidateGroups(reports: Report[], epsilonMeters = DBSCAN_EPSILON_METERS, minPoints = DBSCAN_MIN_POINTS): SpatialCandidateGroup[] {
-  const activeReports = reports.filter((report) => isWithinActiveWindow(report.createdAt)).sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
-  const visited = new Set<string>();
-  const groups: SpatialCandidateGroup[] = [];
-
-  for (const report of activeReports) {
-    if (visited.has(report.id)) {
-      continue;
-    }
-
-    visited.add(report.id);
-    const neighbors = activeReports.filter(
-      (candidate) => candidate.id !== report.id && haversineDistanceMeters(report, candidate) <= epsilonMeters
-    );
-
-    if (neighbors.length + 1 < minPoints) {
-      continue;
-    }
-
-    const clusterMembers = new Set<string>([report.id]);
-    const queue = [...neighbors.map((neighbor) => neighbor.id)];
-
-    while (queue.length > 0) {
-      const candidateId = queue.shift();
-      if (!candidateId || clusterMembers.has(candidateId)) {
-        continue;
-      }
-
-      clusterMembers.add(candidateId);
-      const candidate = activeReports.find((item) => item.id === candidateId);
-      if (!candidate) {
-        continue;
-      }
-
-      const candidateNeighbors = activeReports.filter(
-        (item) => item.id !== candidate.id && haversineDistanceMeters(candidate, item) <= epsilonMeters
-      );
-
-      if (candidateNeighbors.length + 1 >= minPoints) {
-        candidateNeighbors.forEach((neighbor) => {
-          if (!clusterMembers.has(neighbor.id)) {
-            queue.push(neighbor.id);
-          }
-        });
-      }
-    }
-
-    const members = activeReports.filter((candidate) => clusterMembers.has(candidate.id));
-    if (members.length >= minPoints) {
-      groups.push({
-        id: `SC-${hashString(members.map((member) => member.id).sort().join("|")).slice(0, 6)}`,
-        reports: members,
-      });
-    }
-  }
-
-  return groups;
-}
-
 export function createCandidateGroups(reports: Report[]): PatternGroup[] {
-  const groups = dbscanSpatialCandidateGroups(reports);
-
-  if (groups.length > 0) {
-    return groups.map((group) => ({
-      id: createPatternGroupId(group.reports),
-      reports: group.reports,
-    }));
-  }
-
   const relatedGroups: PatternGroup[] = [];
   const processed = new Set<string>();
 
