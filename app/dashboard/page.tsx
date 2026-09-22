@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { buildPatternClusters } from "../../lib/pattern-engine";
+import { REPORTING_CONCERN_REVIEW_THRESHOLD, buildPatternClusters } from "../../lib/pattern-engine";
 
 type Report = {
   id: string;
@@ -15,8 +15,19 @@ type Report = {
   incident_time: string;
 };
 
+type Pattern = ReturnType<typeof buildPatternClusters>[number];
+
+type Alert = {
+  id: string;
+  pattern_group_id: string;
+  title: string | null;
+  status: string | null;
+};
+
 export default function DashboardPage() {
   const [reports, setReports] = useState<Report[]>([]);
+  const [patterns, setPatterns] = useState<Pattern[]>([]);
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -24,7 +35,7 @@ export default function DashboardPage() {
     async function loadReports() {
       try {
         setLoading(true);
-        const response = await fetch("/api/reports?view=authority");
+        const response = await fetch("/api/authority/overview");
         const result = await response.json();
 
         if (!response.ok) {
@@ -33,6 +44,8 @@ export default function DashboardPage() {
         }
 
         setReports(result.reports ?? []);
+        setPatterns(result.patterns ?? []);
+        setAlerts(result.alerts ?? []);
       } catch (loadError) {
         console.error(loadError);
         setError("Unable to connect to the reports API.");
@@ -44,24 +57,36 @@ export default function DashboardPage() {
     void loadReports();
   }, []);
 
-  const clusters = useMemo(() => buildPatternClusters(reports), [reports]);
+  const clusters = useMemo(() => patterns, [patterns]);
   const primaryPattern = clusters[0] ?? null;
-  const relatedReports = primaryPattern?.reports ?? [];
-  const locationSimilarity = primaryPattern?.locationSimilarity ?? 0;
-  const timeSimilarity = primaryPattern?.timeSimilarity ?? 0;
-  const behaviourSimilarity = primaryPattern?.behaviourSimilarity ?? 0;
-  const categorySimilarity = primaryPattern?.categorySimilarity ?? 0;
-  const corroborationScore = primaryPattern?.corroborationScore ?? 0;
-  const recentCount = primaryPattern?.recentCount ?? 0;
-  const previousCount = primaryPattern?.previousCount ?? 0;
-  const risingPercent = primaryPattern?.risingPercent ?? 0;
-  const reportingBehaviourStatus = primaryPattern?.suspicious ? "Review" : "Low";
-  const reportingBehaviourMessage = primaryPattern?.suspicious ? primaryPattern.suspiciousMessage : "No unusual reporting concentration detected.";
-  const safetyActivity = primaryPattern && risingPercent > 0 ? "Rising" : "Monitoring";
-  const reviewStatus = primaryPattern ? "Review" : "Monitoring";
   const recentReports = [...reports]
     .sort((left, right) => new Date(right.incident_time).getTime() - new Date(left.incident_time).getTime())
     .slice(0, 8);
+
+  const activeAlerts = alerts.filter((alert) =>
+    (alert.status === "new" || alert.status === "acknowledged") &&
+    alert.pattern_group_id &&
+    alert.title === "Rising reported safety activity"
+  );
+  const reviewClusters = clusters.filter((cluster) => cluster.manipulationScore >= REPORTING_CONCERN_REVIEW_THRESHOLD || cluster.suspicious);
+  const needsAttention = clusters
+    .map((cluster) => {
+      const hasSafetyAlert = cluster.safetyRiskScore >= 70 && cluster.reports.length >= 10;
+      const hasReview = cluster.manipulationScore >= REPORTING_CONCERN_REVIEW_THRESHOLD || cluster.suspicious;
+      if (!hasSafetyAlert && !hasReview) {
+        return null;
+      }
+      return {
+        id: cluster.patternGroupId,
+        location: cluster.locationName,
+        reportCount: cluster.reports.length,
+        reporterCount: cluster.reporterDiversity,
+        safetyLevel: cluster.safetyRiskScore >= 70 ? "High safety level" : cluster.safetyRiskScore >= 40 ? "Elevated safety level" : "Low safety level",
+        riskLabel: hasReview ? "Possible reporting manipulation" : "High safety level",
+        action: hasReview && hasSafetyAlert ? "alert+review" : hasReview ? "review" : "alert",
+      };
+    })
+    .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   if (loading) {
     return (
@@ -96,131 +121,55 @@ export default function DashboardPage() {
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricCard label="Reports" value={String(reports.length)} />
-          <MetricCard label="Independent reporter signals" value={String(primaryPattern?.reporterDiversity ?? 0)} accent="emerald" />
-          <MetricCard label="Activity change" value={primaryPattern ? `+${risingPercent}%` : "0%"} accent={safetyActivity === "Rising" ? "amber" : "default"} />
-          <MetricCard label="Patterns requiring review" value={primaryPattern ? "1" : "0"} accent={reviewStatus === "Review" ? "red" : "default"} />
+          <MetricCard label="Total reports" value={String(reports.length)} />
+          <MetricCard label="Active safety alerts" value={String(activeAlerts.length)} accent={activeAlerts.length > 0 ? "amber" : "default"} />
+          <MetricCard label="Reviews needed" value={String(reviewClusters.length)} accent={reviewClusters.length > 0 ? "red" : "default"} />
+          <MetricCard label="Active report clusters" value={String(clusters.length)} accent={clusters.length > 0 ? "emerald" : "default"} />
         </div>
 
-        <section className="mt-8 safe-card-strong p-7 md:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="flex flex-wrap gap-3">
-                <span className="rounded-full bg-[#F7E8CC] px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.18em] text-[#C58A32]">Emerging pattern</span>
-                <span className={`rounded-full px-4 py-2 text-[11px] font-extrabold uppercase tracking-[0.18em] ${primaryPattern ? "bg-[#F9E6E4] text-[#B94A48]" : "bg-[#F2ECF3] text-[#432A52]"}`}>
-                  {primaryPattern ? safetyActivity : "Monitoring"}
-                </span>
-              </div>
-
-              <h2 className="mt-5 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36] md:text-4xl">
-                {primaryPattern?.label || "No active pattern"}
-              </h2>
-
-              <p className="mt-3 max-w-2xl text-base leading-7 text-[#5E5967]">
-                {primaryPattern
-                  ? "SafeSignal has connected multiple anonymous submissions around the same local area and time window. The signal supports human review and does not determine guilt or identity."
-                  : "No emerging reported safety pattern is currently strong enough to surface for human review."}
-              </p>
-            </div>
-
-            <div className="min-w-[180px] rounded-2xl border border-[#E7E0E3] bg-white p-5 text-center">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Related reports</p>
-              <p className="mt-2 text-4xl font-extrabold text-[#2D1B36]">{relatedReports.length}</p>
+        <section className="mt-8">
+          <div className="mb-4 flex items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-extrabold text-[#2F3273]">Needs Attention</h2>
+              <p className="mt-1 text-sm text-[#5C628F]">Focused actions for report clusters and reporting review signals.</p>
             </div>
           </div>
-
-          {primaryPattern ? (
-            <>
-              <div className="mt-8 grid gap-4 md:grid-cols-4">
-                <SignalTile label="Location similarity" value={`${locationSimilarity}%`} />
-                <SignalTile label="Time similarity" value={`${timeSimilarity}%`} />
-                <SignalTile label="Behaviour similarity" value={`${behaviourSimilarity}%`} />
-                <SignalTile label="Category similarity" value={`${categorySimilarity}%`} />
-              </div>
-
-              <div className="mt-8">
-                <div className="mb-4">
-                  <h3 className="text-xl font-extrabold text-[#2F3273]">Why these reports were connected</h3>
-                  <p className="mt-1 text-sm text-[#5C628F]">This pattern was assembled using location, timing, category and behavioural consistency.</p>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-                  {primaryPattern.connectionExplanation.map((explanation, index) => (
-                    <div key={`${explanation}-${index}`} className="rounded-2xl border border-[#E7E0E3] bg-white p-5">
-                      <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[#432A52]">
-                        {index === 0 ? "Location" : index === 1 ? "Time" : index === 2 ? "Category" : index === 3 ? "Behaviour" : "Reporter diversity"}
-                      </p>
-                      <p className="mt-2 text-sm leading-6 text-[#5E5967]">{explanation}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-                <div className="rounded-2xl border border-[#E7E0E3] bg-white p-5">
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-bold text-[#2D1B36]">Reporter diversity</p>
-                      <p className="mt-1 text-sm text-[#5E5967]">Multiple anonymous submissions contribute to this pattern.</p>
-                    </div>
-                    <div className="sm:text-right">
-                      <p className="text-3xl font-extrabold text-[#432A52]">{primaryPattern.reporterDiversity}</p>
-                      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#5E5967]">Unique reports</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className={`mt-6 rounded-2xl border p-6 ${primaryPattern.suspicious ? "border-[#F2D496] bg-[#FFF7E8]" : "border-[#E7E0E3] bg-white"}`}>
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className={`font-extrabold ${primaryPattern.suspicious ? "text-[#C58A32]" : "text-[#3F7D63]"}`}>Reporting behaviour</p>
-                    <p className="mt-1 text-sm leading-6 text-[#5E5967]">{reportingBehaviourMessage}</p>
-                  </div>
-                  <div className="text-left sm:text-right">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Status</p>
-                    <p className={`mt-1 text-2xl font-extrabold ${primaryPattern.suspicious ? "text-[#C58A32]" : "text-[#3F7D63]"}`}>{reportingBehaviourStatus}</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-[#C9E8D9] bg-[#EEF9F4] p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-extrabold text-[#3F7D63]">Corroboration support</p>
-                    <p className="mt-1 text-sm text-[#5E5967]">Support indicator based on consistency across related reports.</p>
-                  </div>
-                  <p className="text-4xl font-extrabold text-[#3F7D63]">{corroborationScore}/100</p>
-                </div>
-              </div>
-
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <InfoBlock label="Recent activity" value={String(recentCount)} description="Related reports in the recent 7-day window." />
-                <InfoBlock label="Previous activity" value={String(previousCount)} description="Related reports in the previous 7-day window." />
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-[#F9DF77] bg-[#FFF9DE] p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-3">
-                      <span className="rounded-full bg-[#FFF5C8] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#B45309]">Rising activity</span>
-                      <span className="rounded-full bg-[#FEE2E2] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#B91C1C]">Support signal</span>
-                    </div>
-                    <h3 className="mt-4 text-xl font-extrabold text-[#2F3273]">Emerging activity at {primaryPattern.label}</h3>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5C628F]">Reported safety activity is higher than the previous comparison period. This is not evidence of guilt or perpetrator identity.</p>
-                  </div>
-                  <div className="rounded-xl border border-[#F6D35A] bg-white px-5 py-4 text-left sm:text-right">
-                    <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Trend</p>
-                    <p className="mt-1 text-lg font-extrabold text-[#B45309]">+{risingPercent}%</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="mt-6 rounded-2xl border border-[#E7E0E3] bg-white p-6">
-                <p className="font-extrabold text-[#2F3273]">Human review recommended</p>
-                <p className="mt-2 text-sm leading-6 text-[#5C628F]">SafeSignal surfaces reported patterns for human review. It does not determine guilt, identify perpetrators, or automatically trigger enforcement.</p>
-              </div>
-            </>
+          {needsAttention.length === 0 ? (
+            <div className="safe-card p-6 text-[#5E5967]">
+              <p className="font-extrabold text-[#2D1B36]">No active issues</p>
+              <p className="mt-2 text-sm">No report cluster currently needs authority action.</p>
+            </div>
           ) : (
-            <div className="mt-8 rounded-2xl border border-[#E7E0E3] bg-white p-6 text-[#5E5967]">
-              No active pattern is currently strong enough to surface. The stream remains under monitoring.
+            <div className="grid gap-4 lg:grid-cols-2">
+              {needsAttention.map((item) => (
+                <article key={item.id} className="safe-card p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">{item.id}</p>
+                      <h3 className="mt-2 text-xl font-extrabold text-[#2D1B36]">{item.location}</h3>
+                    </div>
+                    <span className={`status-badge ${item.action.includes("review") ? "status-badge--medium" : "status-badge--low"}`}>
+                      {item.action === "alert+review" ? "Alert + review" : item.action === "review" ? "Review" : "Alert"}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
+                    <InfoBlock label="Related reports" value={String(item.reportCount)} description="Reports in this cluster" />
+                    <InfoBlock label="Different reporters" value={String(item.reporterCount)} description="Distinct reporter signals" />
+                    <InfoBlock label="Safety level" value={item.safetyLevel.includes("High") ? "HIGH" : item.safetyLevel.includes("Elevated") ? "ELEVATED" : "LOW"} description="Reported activity" />
+                    <InfoBlock label="Reporting concern" value={item.action.includes("review") ? "HIGH" : "LOW"} description="Review threshold" />
+                  </div>
+                  <div className="mt-5 flex flex-wrap gap-3">
+                    {item.action === "review" || item.action === "alert+review" ? (
+                      <a href={`/reviews?patternGroupId=${encodeURIComponent(item.id)}`} className="primary-btn inline-flex">Review</a>
+                    ) : null}
+                    {item.action === "alert" || item.action === "alert+review" ? (
+                      <a href={`/patterns/${encodeURIComponent(item.id)}`} className="secondary-btn inline-flex">View Alert</a>
+                    ) : (
+                      <a href={`/patterns/${encodeURIComponent(item.id)}`} className="secondary-btn inline-flex">View Cluster</a>
+                    )}
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </section>

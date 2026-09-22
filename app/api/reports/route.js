@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   analyzePersistedReportsAndCreateAlerts,
 } from "../../../lib/alerts";
+import { getPersistedPatternClusterForReport } from "../../../lib/pattern-groups";
 import { createSupabaseServerClient } from "../../../lib/supabase/server";
 import { isAuthorityUser } from "../../../lib/supabase/authority";
 
@@ -36,7 +37,7 @@ function normalizeOptionalText(value) {
 
 function normalizeStatus(value) {
   const normalized = normalizeText(value || "").toLowerCase();
-  const validStatuses = ["submitted", "connected", "under_review", "reviewed"];
+  const validStatuses = ["submitted", "connected", "under_review", "investigating", "reviewed", "dismissed", "resolved", "deferred"];
 
   return validStatuses.includes(normalized) ? normalized : null;
 }
@@ -79,13 +80,33 @@ export async function GET(request) {
 
     const analysisResult = await analyzePersistedReportsAndCreateAlerts({
       reportId,
-      runAnalysis: includeCoordinates,
+      runAnalysis: false,
       includeCoordinates,
     });
+
+    let pattern = null;
+    let authorityAlert = null;
+
+    if (reportId && !includeCoordinates) {
+      pattern = await getPersistedPatternClusterForReport(reportId.toUpperCase());
+
+      if (pattern) {
+        const supabase = getSupabaseAdmin();
+        const { data: alert } = await supabase
+          .from("alerts")
+          .select("id, pattern_group_id, title, status, created_at")
+          .eq("pattern_group_id", pattern.patternGroupId)
+          .in("status", ["new", "acknowledged", "resolved"])
+          .maybeSingle();
+        authorityAlert = alert ?? null;
+      }
+    }
 
     return NextResponse.json({
       report: analysisResult.report,
       reports: analysisResult.reports,
+      pattern,
+      authorityAlert,
     });
   } catch (error) {
     return NextResponse.json(
@@ -159,7 +180,7 @@ export async function POST(request) {
     }
 
     try {
-      await analyzePersistedReportsAndCreateAlerts({ runAnalysis: true });
+      await analyzePersistedReportsAndCreateAlerts({ runAnalysis: true, includeCoordinates: true });
     } catch (error) {
       console.error("Authority alert analysis failed after report submission.", error);
     }

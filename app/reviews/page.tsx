@@ -1,8 +1,8 @@
 ﻿"use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { buildPatternClusters } from "../../lib/pattern-engine";
+import { useRouter, useSearchParams } from "next/navigation";
+import { REPORTING_CONCERN_REVIEW_THRESHOLD, type PatternCluster } from "../../lib/pattern-engine";
 import { isAuthorityUser } from "../../lib/supabase/authority";
 import { createSupabaseBrowserClient } from "../../lib/supabase/browser";
 
@@ -20,9 +20,12 @@ type ReviewReport = {
 
 export default function ReviewsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedPatternGroupId = searchParams.get("patternGroupId");
   const [status, setStatus] = useState("submitted");
   const [notes, setNotes] = useState("");
   const [reports, setReports] = useState<ReviewReport[]>([]);
+  const [selectedPattern, setSelectedPattern] = useState<PatternCluster | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -38,12 +41,33 @@ export default function ReviewsPage() {
       }
 
       try {
-        const response = await fetch("/api/reports?view=authority");
+        if (!selectedPatternGroupId) {
+          setSelectedPattern(null);
+          setReports([]);
+          setStatus("submitted");
+          setNotes("");
+          return;
+        }
+
+        const response = await fetch("/api/authority/overview");
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Unable to load the review queue.");
 
-        setReports(result.reports ?? []);
-        const firstReport = (result.reports ?? [])[0];
+        const loadedPattern = (result.patterns ?? []).find((pattern: { patternGroupId: string }) => pattern.patternGroupId === selectedPatternGroupId);
+        if (!loadedPattern) {
+          setSelectedPattern(null);
+          setReports([]);
+          setStatus("submitted");
+          setNotes("");
+          return;
+        }
+        if (loadedPattern.manipulationScore < REPORTING_CONCERN_REVIEW_THRESHOLD) {
+          router.replace(`/patterns/${encodeURIComponent(loadedPattern.patternGroupId)}`);
+          return;
+        }
+        setSelectedPattern(loadedPattern);
+        setReports(loadedPattern.reports ?? []);
+        const firstReport = loadedPattern.reports?.[0];
         if (firstReport) {
           setStatus((firstReport.status || "submitted").toLowerCase());
           setNotes(firstReport.review_notes || "");
@@ -56,11 +80,11 @@ export default function ReviewsPage() {
     }
 
     void loadReviewQueue();
-  }, [router]);
+  }, [router, selectedPatternGroupId]);
 
-  const clusters = useMemo(() => buildPatternClusters(reports), [reports]);
-  const primaryPattern = clusters[0] ?? null;
-  const relatedReports = primaryPattern?.reports ?? [];
+  const activeReports = useMemo(() => reports.filter((report) => (report.status ?? "submitted").toLowerCase() !== "deferred"), [reports]);
+  const primaryPattern = useMemo(() => selectedPattern ? { ...selectedPattern, reports: activeReports } : null, [activeReports, selectedPattern]);
+  const relatedReports = useMemo(() => primaryPattern?.reports ?? [], [primaryPattern]);
   const relatedCount = relatedReports.length;
   const corroborationScore = primaryPattern?.corroborationScore ?? 0;
   const reporterDiversity = primaryPattern?.reporterDiversity ?? 0;
@@ -69,7 +93,7 @@ export default function ReviewsPage() {
   const reportingBehaviourStatus = primaryPattern?.suspicious ? "Review" : "Low";
   const reportingBehaviourMessage = primaryPattern?.suspicious ? primaryPattern.suspiciousMessage : "No unusual reporting concentration detected.";
 
-  async function handleReviewAction(nextStatus: "under_review" | "reviewed") {
+  async function handleReviewAction(nextStatus: "investigating" | "dismissed" | "deferred") {
     setSaving(true);
     setError("");
 
@@ -133,18 +157,30 @@ export default function ReviewsPage() {
     );
   }
 
+  if (!selectedPattern && !selectedPatternGroupId) {
+    return (
+      <main className="bg-[#FAF8F5] py-10 text-[#3B3540] md:py-12">
+        <div className="page-shell max-w-3xl rounded-3xl border border-[#E7E0E3] bg-white p-8">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#432A52]">Report review</p>
+          <h1 className="mt-2 text-3xl font-extrabold text-[#2D1B36]">No reporting reviews needed</h1>
+          <p className="mt-3 text-[#5E5967]">No report cluster is currently above the review threshold.</p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="bg-[#FAF8F5] py-10 text-[#3B3540] md:py-12">
       <div className="page-shell">
         <div className="mb-8 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#432A52]">Authority review</p>
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#432A52]">Report review</p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-[-0.04em] text-[#2D1B36]">
-              {primaryPattern ? `Reviewing ${primaryPattern.label}` : "Review queue"}
+              {primaryPattern ? `Reporting Review` : "Review queue"}
             </h1>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[#E7E0E3] bg-white px-4 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#432A52]">
-            {primaryPattern ? "Human review required" : "Monitoring"}
+            {primaryPattern?.suspicious ? "Review needed" : "Monitoring"}
           </div>
         </div>
 
@@ -155,43 +191,45 @@ export default function ReviewsPage() {
               <p className="mt-2 text-3xl font-extrabold text-[#2D1B36]">{status}</p>
             </div>
             <div className="rounded-full border border-[#E7E0E3] bg-[#FAF8F5] px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-[#432A52]">
-              Human decision required
+              Human review required
             </div>
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-          <MetricCard label="Related Reports" value={String(relatedCount)} />
-          <MetricCard label="Corroboration Support" value={`${corroborationScore}/100`} accent="emerald" />
-          <MetricCard label="Recent Activity" value={String(recentCount)} />
-          <MetricCard label="Previous Activity" value={String(previousCount)} />
-          <MetricCard label="Reporter Diversity" value={String(reporterDiversity)} accent="emerald" />
-        </section>
+        {primaryPattern ? <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <MetricCard label="Related reports" value={String(relatedCount)} />
+          <MetricCard label="Different reporters" value={String(reporterDiversity)} accent="emerald" />
+          <MetricCard label="Safety level" value={`${primaryPattern.safetyRiskScore}/100`} />
+          <MetricCard label="Reporting concern" value={`${primaryPattern.manipulationScore}`} accent="amber" />
+          <MetricCard label="Report consistency" value={`${corroborationScore}/100`} accent="emerald" />
+        </section> : null}
 
-        {primaryPattern ? (
+        {primaryPattern?.suspicious ? (
           <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
             <aside className="safe-card p-5 md:p-6">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Pattern review</p>
-                  <h2 className="mt-2 text-2xl font-extrabold text-[#2D1B36]">{primaryPattern.label}</h2>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Report cluster</p>
+                  <h2 className="mt-2 text-2xl font-extrabold text-[#2D1B36]">{primaryPattern.locationName}</h2>
                 </div>
                 <span className="status-badge status-badge--medium">{status}</span>
               </div>
 
               <div className="mt-6 space-y-4">
                 <div className="rounded-2xl border border-[#E7E0E3] bg-[#FAF8F5] p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Rising reported safety activity</p>
-                  <p className="mt-2 text-3xl font-extrabold text-[#2D1B36]">+{primaryPattern.risingPercent || 0}%</p>
+                  <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#432A52]">Safety level</p>
+                  <p className="mt-2 text-3xl font-extrabold text-[#2D1B36]">
+                {primaryPattern.risingPercent === null ? "New activity" : `+${primaryPattern.risingPercent}%`}
+              </p>
                 </div>
 
                 <div className="rounded-2xl border border-[#E7E0E3] bg-white p-4">
-                  <p className="text-sm font-bold text-[#2D1B36]">Why this pattern was flagged</p>
+                  <p className="text-sm font-bold text-[#2D1B36]">Why this was flagged</p>
                   <div className="mt-4 space-y-3">
                     {primaryPattern.connectionExplanation.map((item, index) => (
                       <div key={`${item}-${index}`} className="rounded-xl border border-[#E7E0E3] bg-[#FAF8F5] p-3">
                         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-[#432A52]">
-                          {index === 0 ? "Location" : index === 1 ? "Time" : index === 2 ? "Category" : index === 3 ? "Behaviour" : "Reporter diversity"}
+                          {index === 0 ? "Location" : index === 1 ? "Time" : index === 2 ? "Category" : index === 3 ? "Behaviour" : "Different reporters"}
                         </p>
                         <p className="mt-1 text-sm leading-6 text-[#5E5967]">{item}</p>
                       </div>
@@ -201,12 +239,12 @@ export default function ReviewsPage() {
 
                 <div className="rounded-2xl border border-[#E7E0E3] bg-white p-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-bold text-[#2D1B36]">Reporting behaviour</p>
+                    <p className="text-sm font-bold text-[#2D1B36]">Reporting concern</p>
                     <span className={`status-badge ${primaryPattern.suspicious ? "status-badge--medium" : "status-badge--low"}`}>
-                      {reportingBehaviourStatus}
+                      {primaryPattern.suspicious ? "Elevated" : "Low"}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[#5E5967]">{reportingBehaviourMessage}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#5E5967]">These reports show unusually concentrated reporting behaviour. Human review is recommended.</p>
                 </div>
               </div>
             </aside>
@@ -215,14 +253,14 @@ export default function ReviewsPage() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">Review action</p>
-                  <h2 className="mt-2 text-2xl font-extrabold text-[#2D1B36]">Human review workspace</h2>
+                  <h2 className="mt-2 text-2xl font-extrabold text-[#2D1B36]">Review notes</h2>
                 </div>
                 <div className="rounded-full border border-[#E7E0E3] bg-[#FAF8F5] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.14em] text-[#432A52]">
                   {relatedCount} related
                 </div>
               </div>
 
-              <label className="mt-6 block text-sm font-bold text-[#2D1B36]">Review notes</label>
+              <label className="mt-6 block text-sm font-bold text-[#2D1B36]">Authority notes</label>
               <textarea
                 value={notes}
                 onChange={(event) => setNotes(event.target.value)}
@@ -233,10 +271,13 @@ export default function ReviewsPage() {
               {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
 
               <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-                <button type="button" onClick={() => handleReviewAction("under_review")} disabled={saving} className="primary-btn flex-1">
+                <button type="button" onClick={() => handleReviewAction("investigating")} disabled={saving} className="primary-btn flex-1">
                   {saving ? "Saving..." : "Mark as Investigating"}
                 </button>
-                <button type="button" onClick={() => handleReviewAction("reviewed")} disabled={saving} className="secondary-btn flex-1">
+                <button type="button" onClick={() => handleReviewAction("deferred")} disabled={saving} className="secondary-btn flex-1">
+                  {saving ? "Saving..." : "Defer"}
+                </button>
+                <button type="button" onClick={() => handleReviewAction("dismissed")} disabled={saving} className="secondary-btn flex-1">
                   {saving ? "Saving..." : "Dismiss"}
                 </button>
               </div>
@@ -244,7 +285,8 @@ export default function ReviewsPage() {
           </div>
         ) : (
           <section className="mt-8 safe-card p-6 text-[#5C628F]">
-            No active pattern is currently available for review. The queue is empty until a connected cluster emerges.
+            <p className="font-extrabold text-[#2D1B36]">NO REPORTS REQUIRE HUMAN REVIEW</p>
+            <p className="mt-2">No suspicious reporting pattern is currently awaiting review.</p>
           </section>
         )}
 
@@ -257,10 +299,12 @@ export default function ReviewsPage() {
   );
 }
 
-function MetricCard({ label, value, accent = "default" }: { label: string; value: string; accent?: "default" | "emerald" }) {
+function MetricCard({ label, value, accent = "default" }: { label: string; value: string; accent?: "default" | "emerald" | "amber" | "red" }) {
   const styles = {
     default: "border-[#E7E0E3] bg-white text-[#2D1B36]",
     emerald: "border-[#C7F9D9] bg-[#ECFDF5] text-[#15803d]",
+    amber: "border-[#F9DF77] bg-[#FFF9DE] text-[#B45309]",
+    red: "border-[#FECACA] bg-[#FEF2F2] text-[#B91C1C]",
   }[accent];
 
   return (

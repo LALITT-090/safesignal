@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS public.alerts (
 ALTER TABLE public.alerts
   ADD COLUMN IF NOT EXISTS pattern_group_id text,
   ADD COLUMN IF NOT EXISTS risk_score numeric,
+  ADD COLUMN IF NOT EXISTS manipulation_score numeric,
   ADD COLUMN IF NOT EXISTS report_count integer,
   ADD COLUMN IF NOT EXISTS independent_reporter_signals integer,
   ADD COLUMN IF NOT EXISTS activity_change_percent numeric,

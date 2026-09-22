@@ -42,6 +42,8 @@ export function AppHeader() {
 
   const activeMode =
     pathname.startsWith("/dashboard") ||
+    pathname.startsWith("/authority") ||
+    pathname.startsWith("/patterns") ||
     pathname.startsWith("/reviews") ||
     pathname.startsWith("/map") ||
     pathname.startsWith("/operations")
@@ -50,7 +52,7 @@ export function AppHeader() {
 
   const authorityLinks = [
     { href: "/dashboard", label: "Dashboard" },
-    { href: "/reviews", label: "Reviews" },
+    { href: "/authority/reports", label: "Reports" },
     { href: "/map", label: "Map" },
     { href: "/operations", label: "Alerts" },
   ];
@@ -74,7 +76,7 @@ export function AppHeader() {
       <div className="page-shell flex items-center justify-between gap-4 py-3.5">
         <div className="flex items-center gap-3">
           <Link href={activeMode === "authority" ? "/dashboard" : "/"} className="text-sm font-extrabold uppercase tracking-[0.22em] text-[#2D1B36]">
-            SafeSignal
+            {activeMode === "authority" ? "SafeSignal Authority" : "SafeSignal"}
           </Link>
           <span className="hidden rounded-full border border-[#E7E0E3] bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#432A52] sm:inline-flex">
             {activeMode === "authority" ? "Authority" : "Public"}
@@ -90,6 +92,7 @@ export function AppHeader() {
               active={
                 pathname === link.href ||
                 (link.href === "/dashboard" && pathname.startsWith("/dashboard")) ||
+                (link.href === "/authority/reports" && pathname.startsWith("/authority/reports")) ||
                 (link.href === "/operations" && pathname.startsWith("/operations"))
               }
             />
@@ -143,6 +146,7 @@ export function AppHeader() {
                   "rounded-2xl px-3 py-2.5 text-sm font-semibold",
                   pathname === link.href ||
                   (link.href === "/dashboard" && pathname.startsWith("/dashboard")) ||
+                  (link.href === "/authority/reports" && pathname.startsWith("/authority/reports")) ||
                   (link.href === "/operations" && pathname.startsWith("/operations"))
                     ? "bg-[#F2ECF3] text-[#2D1B36]"
                     : "text-[#432A52] hover:bg-[#FAF8F5]",

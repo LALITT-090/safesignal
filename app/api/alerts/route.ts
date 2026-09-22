@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
-import { analyzePersistedReportsAndCreateAlerts, listAuthorityAlerts } from "../../../lib/alerts";
+import { listAuthorityAlerts } from "../../../lib/alerts";
 import { createSupabaseServerClient } from "../../../lib/supabase/server";
 import { isAuthorityUser } from "../../../lib/supabase/authority";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const statusFilter = searchParams.get("status");
+  const normalizedFilter = statusFilter ? statusFilter.toLowerCase() : "all";
+
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -17,8 +21,7 @@ export async function GET() {
   }
 
   try {
-    await analyzePersistedReportsAndCreateAlerts({ runAnalysis: true });
-    const alerts = await listAuthorityAlerts();
+    const alerts = await listAuthorityAlerts(normalizedFilter === "all" ? null : normalizedFilter);
     return NextResponse.json({ alerts });
   } catch (error) {
     return NextResponse.json(

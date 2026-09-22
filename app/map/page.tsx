@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { buildPatternClusters, PatternReport } from "../../lib/pattern-engine";
+import type { PatternCluster } from "../../lib/pattern-engine";
 import { isAuthorityUser } from "../../lib/supabase/authority";
 import { createSupabaseBrowserClient } from "../../lib/supabase/browser";
 import type { MapReport } from "./map-view";
@@ -20,6 +20,7 @@ const MapView = dynamic(() => import("./map-view"), {
 export default function AuthorityMapPage() {
   const router = useRouter();
   const [reports, setReports] = useState<MapReport[]>([]);
+  const [clusters, setClusters] = useState<PatternCluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -37,7 +38,7 @@ export default function AuthorityMapPage() {
 
       try {
         setLoading(true);
-        const response = await fetch("/api/reports?view=authority");
+        const response = await fetch("/api/authority/overview");
         const result = await response.json();
 
         if (!response.ok) {
@@ -46,6 +47,7 @@ export default function AuthorityMapPage() {
         }
 
         setReports(result.reports ?? []);
+        setClusters(result.patterns ?? []);
       } catch (loadError) {
         console.error(loadError);
         setError(
@@ -61,23 +63,13 @@ export default function AuthorityMapPage() {
     void loadReports();
   }, [router]);
 
-  const patternReports: PatternReport[] = useMemo(() => {
-    return reports.map((r) => ({
-      id: r.id,
-      report_id: r.report_id,
-      category: r.category,
-      description: r.description,
-      location_name: r.location_name,
-      location_label: r.location_label,
-      latitude: r.latitude,
-      longitude: r.longitude,
-      incident_time: r.incident_time,
-      status: r.status,
-    }));
-  }, [reports]);
+  const [selectedPatternGroupId, setSelectedPatternGroupId] = useState<string | null>(null);
+  const effectiveSelectedPatternGroupId = selectedPatternGroupId ?? clusters[0]?.patternGroupId ?? null;
 
-  const clusters = useMemo(() => buildPatternClusters(patternReports), [patternReports]);
-  const primaryPattern = clusters[0] ?? null;
+  const primaryPattern = useMemo(
+    () => clusters.find((cluster) => cluster.patternGroupId === effectiveSelectedPatternGroupId) ?? null,
+    [clusters, effectiveSelectedPatternGroupId]
+  );
   const relatedReports = useMemo(
     () => primaryPattern?.reports ?? [],
     [primaryPattern]
@@ -110,8 +102,8 @@ export default function AuthorityMapPage() {
   const corroborationScore = primaryPattern?.corroborationScore ?? 0;
   const recentCount = primaryPattern?.recentCount ?? 0;
   const previousCount = primaryPattern?.previousCount ?? 0;
-  const risingPercent = primaryPattern?.risingPercent ?? 0;
-  const isRising = primaryPattern && risingPercent > 0;
+  const risingPercent = primaryPattern?.risingPercent ?? null;
+  const isRising = Boolean(primaryPattern && typeof risingPercent === "number" && risingPercent > 0);
 
   const signalDetails = [
     { label: "Location consistency", value: `${locationConsistency}%` },
@@ -151,7 +143,7 @@ export default function AuthorityMapPage() {
                 Report cluster
               </p>
               <h2 className="mt-1 text-xl font-bold text-[#2D1B36]">
-                {primaryPattern?.label || (reports.length > 0 ? "All Reports" : "No Reports")}
+                {primaryPattern?.label || (reports.length > 0 ? "All report clusters" : "No reports")}
               </h2>
             </div>
             <div className="flex items-center gap-2 text-sm text-[#5E5967]">
@@ -209,7 +201,7 @@ export default function AuthorityMapPage() {
                     : "border-[#E7E0E3] bg-[#FAF8F5] text-[#5E5967]"
                 }`}
               >
-                {isRising ? "RISING" : "MONITORING"}
+                {risingPercent === null ? "NEW" : isRising ? "RISING" : "MONITORING"}
               </span>
             </div>
 
@@ -221,11 +213,11 @@ export default function AuthorityMapPage() {
                 accent="emerald"
               />
               <Metric
-                label="Recent Activity"
+                label="Recent activity"
                 value={`${recentCount} reports`}
                 accent={isRising ? "amber" : "default"}
               />
-              <Metric label="Previous Activity" value={`${previousCount} reports`} />
+              <Metric label="Previous activity" value={`${previousCount} reports`} />
             </div>
 
             <div className="mt-5 rounded-xl border border-[#F0D9A1] bg-[#FFF7E8] p-4">
@@ -234,9 +226,40 @@ export default function AuthorityMapPage() {
               </p>
               <p className="mt-2 text-sm leading-6 text-[#5E5967]">
                 {primaryPattern
-                  ? "Possible emerging pattern — human review recommended."
-                  : "No emerging pattern currently detected in geographic reports."}
+                  ? risingPercent === null
+                    ? primaryPattern.suspicious ? "Possible reporting manipulation requires human review." : "New safety activity detected."
+                    : primaryPattern.suspicious ? "Possible reporting manipulation requires human review." : "Safety activity is increasing in this area."
+                  : "No active report cluster currently needs attention."}
               </p>
+              {clusters.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {clusters.map((cluster) => (
+                    <button
+                      key={cluster.patternGroupId}
+                      type="button"
+                      onClick={() => setSelectedPatternGroupId(cluster.patternGroupId)}
+                      className={`rounded-full border px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.14em] ${
+                        cluster.patternGroupId === primaryPattern?.patternGroupId
+                          ? "border-[#432A52] bg-[#432A52] text-white"
+                          : "border-[#E7E0E3] bg-white text-[#432A52]"
+                      }`}
+                    >
+                      {cluster.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {primaryPattern && (
+                <button
+                  type="button"
+                  onClick={() => router.push(primaryPattern.suspicious
+                    ? `/reviews?patternGroupId=${encodeURIComponent(primaryPattern.patternGroupId)}`
+                    : `/patterns/${encodeURIComponent(primaryPattern.patternGroupId)}`)}
+                  className="mt-4 rounded-full border border-[#432A52] bg-[#432A52] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.18em] text-white"
+                >
+                  View Cluster
+                </button>
+              )}
             </div>
           </section>
 
@@ -262,6 +285,14 @@ export default function AuthorityMapPage() {
                 </div>
               ))}
             </div>
+            {primaryPattern && (
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <Metric label="Safety level" value={`${primaryPattern.safetyRiskScore}/100`} />
+                <Metric label="Reporting concern" value={String(primaryPattern.manipulationScore)} />
+                <Metric label="Different reporters" value={String(primaryPattern.reporterDiversity)} />
+                <Metric label="Location" value={primaryPattern.locationName} />
+              </div>
+            )}
           </section>
 
           <section className="rounded-2xl border border-[#F0D9A1] bg-[#FFF7E8] p-5 sm:p-6">

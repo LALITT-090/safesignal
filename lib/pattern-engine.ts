@@ -14,12 +14,17 @@ export type SemanticSimilarityProvider = {
 
 export type Report = {
   id: string;
+  report_id?: string;
   incidentType: IncidentType;
   description?: string;
   latitude: number;
   longitude: number;
   createdAt: Date;
   anonymousToken: string;
+  location_name?: string | null;
+  location_label?: string | null;
+  status?: string | null;
+  review_notes?: string | null;
 };
 
 export type PatternGroup = {
@@ -30,6 +35,7 @@ export type PatternGroup = {
 export type ValidationResult = {
   valid: boolean;
   suspicious: boolean;
+  manipulationScore: number;
   totalReports: number;
   uniqueReporters: number;
   timeSpreadHours: number;
@@ -42,8 +48,8 @@ export type ValidationResult = {
 export type TrendAnalysis = {
   currentCount: number;
   previousCount: number;
-  percentageChange: number;
-  direction: "rising" | "stable" | "declining";
+  percentageChange: number | null;
+  direction: "rising" | "stable" | "declining" | "new";
   currentWindowStart: Date;
   previousWindowStart: Date;
 };
@@ -68,14 +74,15 @@ export type AuthorityAlert = {
   title: string;
   severity: "elevated" | "high";
   riskScore: number;
+  manipulationScore: number;
   reportCount: number;
   independentReporterSignals: number;
-  activityChangePercent?: number;
+  activityChangePercent?: number | null;
   categorySummary: string[];
   generalLocation: string;
   explanation: string;
   createdAt: Date;
-  requiresHumanReview: true;
+  requiresHumanReview: boolean;
 };
 
 export type RelatedResult = {
@@ -98,11 +105,19 @@ export type PatternReport = {
   incident_time?: string | null;
   status?: string | null;
   anonymous_token?: string | null;
+  review_notes?: string | null;
 };
 
 export type PatternCluster = {
+  patternGroupId: string;
   label: string;
   reports: PatternReport[];
+  locationName: string;
+  areaName: string;
+  city: string;
+  safetyRiskScore: number;
+  manipulationScore: number;
+  status: string;
   locationSimilarity: number;
   timeSimilarity: number;
   categorySimilarity: number;
@@ -111,17 +126,30 @@ export type PatternCluster = {
   reporterDiversity: number;
   recentCount: number;
   previousCount: number;
-  risingPercent: number;
+  risingPercent: number | null;
   suspicious: boolean;
   suspiciousMessage: string;
   connectionExplanation: string[];
 };
 
+export function resolvePatternCluster(
+  patterns: PatternCluster[],
+  patternGroupId: string | null | undefined
+) {
+  if (!patternGroupId) {
+    return null;
+  }
+
+  return patterns.find((pattern) => pattern.patternGroupId === patternGroupId) ?? null;
+}
+
 export const LOCATION_RADIUS_METERS = 500;
 export const TIME_WINDOW_DAYS = 7;
 export const MIN_UNIQUE_REPORTERS = 2;
+export const MIN_RELATED_REPORTS_FOR_RECOGNIZED_CLUSTER = 10;
 export const RISK_ALERT_THRESHOLD = 70;
-export const TREND_ALERT_THRESHOLD_PERCENT = 25;
+export const REPORTING_CONCERN_REVIEW_THRESHOLD = 75;
+export const TREND_ALERT_THRESHOLD_PERCENT = 20;
 
 export const RELATED_INCIDENT_TYPES: Record<IncidentType, IncidentType[]> = {
   harassment: ["harassment", "inappropriate_behaviour", "following", "stalking"],
@@ -213,8 +241,12 @@ export function hashString(value: string) {
   return hash.toString(16).padStart(8, "0").toUpperCase();
 }
 
+function getAuthorityLocation(report: Report) {
+  return report.location_name || report.location_label || "General area";
+}
+
 export function createPatternGroupId(reports: Report[]) {
-  const sortedIds = [...new Set(reports.map((report) => report.id))].sort();
+  const sortedIds = [...new Set(reports.map((report) => report.report_id ?? report.id))].sort();
   const seed = sortedIds.join("|") || "empty";
   return `PG-${hashString(seed).slice(0, 6)}`;
 }
@@ -256,6 +288,18 @@ export function isWithinActiveWindow(reportDate: Date | string | number, now: Da
   }
 
   return currentTime - reportTime <= TIME_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+}
+
+function getDatasetReferenceTime(reports: Report[]) {
+  if (reports.length === 0) {
+    return new Date();
+  }
+
+  const latestTime = new Date(
+    Math.max(...reports.map((report) => new Date(report.createdAt).getTime()))
+  );
+
+  return Number.isNaN(latestTime.getTime()) ? new Date() : latestTime;
 }
 
 export function isRelated(newReport: Report, existingReport: Report): RelatedResult {
@@ -322,7 +366,15 @@ export function createDefaultSemanticSimilarityProvider(): SemanticSimilarityPro
 }
 
 export function isLegacyReportLike(value: unknown): value is PatternReport {
-  return !!value && typeof value === "object" && "report_id" in value && typeof (value as PatternReport).report_id === "string";
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as PatternReport;
+  const hasPersistedId = typeof candidate.report_id === "string" && candidate.report_id.trim().length > 0;
+  const hasLegacyId = typeof candidate.id === "string" && candidate.id.trim().length > 0;
+
+  return hasPersistedId || hasLegacyId;
 }
 
 export function toSafeSignalReport(report: PatternReport): Report | null {
@@ -339,8 +391,11 @@ export function toSafeSignalReport(report: PatternReport): Report | null {
 
   const createdAtValue = report.incident_time ? new Date(report.incident_time) : new Date();
 
+  const publicReportId = String(report.report_id ?? report.id ?? "");
+
   return {
-    id: String(report.id ?? report.report_id),
+    id: publicReportId || String(report.id ?? "unknown"),
+    report_id: publicReportId || String(report.id ?? "unknown"),
     incidentType: normalizeIncidentType(report.category || "other"),
     description: report.description ?? undefined,
     latitude,
@@ -349,7 +404,11 @@ export function toSafeSignalReport(report: PatternReport): Report | null {
     anonymousToken:
       typeof report.anonymous_token === "string" && report.anonymous_token.trim().length > 0
         ? report.anonymous_token.trim()
-        : String(report.report_id),
+        : publicReportId || String(report.id ?? "unknown"),
+      location_name: report.location_name ?? null,
+      location_label: report.location_label ?? null,
+      status: report.status ?? null,
+      review_notes: report.review_notes ?? null,
   };
 }
 
@@ -365,6 +424,47 @@ export function calculateTokenConcentration(reports: Report[]) {
 
   const mostUsedTokenCount = Math.max(...counts.values());
   return mostUsedTokenCount / reports.length;
+}
+
+export function calculateManipulationScore(patternGroup: PatternGroup, validation: ValidationResult): number {
+  const reportCount = Math.max(1, patternGroup.reports.length);
+  const tokenContribution = Math.min(40, validation.tokenConcentration * 40);
+  const burstContribution = validation.timeSpreadHours <= 24 && reportCount >= 3 ? 25 : 0;
+
+  const similarityValues: number[] = [];
+  for (let index = 0; index < patternGroup.reports.length; index += 1) {
+    for (let comparisonIndex = index + 1; comparisonIndex < patternGroup.reports.length; comparisonIndex += 1) {
+      const first = patternGroup.reports[index];
+      const second = patternGroup.reports[comparisonIndex];
+      const similarity = calculateJaccardSimilarity(
+        tokenizeDescription(first.description || ""),
+        tokenizeDescription(second.description || "")
+      );
+      similarityValues.push(similarity);
+    }
+  }
+
+  const contentSimilarity = similarityValues.length > 0
+    ? (similarityValues.reduce((sum, value) => sum + value, 0) / similarityValues.length) * 20
+    : 0;
+
+  const locationRepetition = reportCount > 1
+    ? Math.min(
+        10,
+        (patternGroup.reports.reduce((sum) => sum + 1, 0) / reportCount) * 10
+      )
+    : 0;
+
+  const categoryRepetition = validation.categoryDiversity >= 2 && validation.reporterDiversityRatio && validation.reporterDiversityRatio < 0.8
+    ? 5
+    : 0;
+
+  const score = Math.min(
+    100,
+    Math.round(tokenContribution + burstContribution + contentSimilarity + locationRepetition + categoryRepetition)
+  );
+
+  return score;
 }
 
 export function validatePatternGroup(patternGroup: PatternGroup): ValidationResult {
@@ -390,7 +490,7 @@ export function validatePatternGroup(patternGroup: PatternGroup): ValidationResu
     suspiciousReasons.push("Low independent reporter signal diversity");
   }
 
-  if (timeSpreadHours <= 24 && totalReports >= 3) {
+  if (timeSpreadHours <= 24 && totalReports >= 3 && tokenConcentration >= 0.6) {
     suspiciousReasons.push("Multiple highly similar submissions in a short interval");
   }
 
@@ -399,11 +499,24 @@ export function validatePatternGroup(patternGroup: PatternGroup): ValidationResu
   }
 
   const valid = totalReports >= 2 && uniqueReporters >= MIN_UNIQUE_REPORTERS;
-  const suspicious = suspiciousReasons.length > 0;
+  const manipulationScore = calculateManipulationScore(patternGroup, {
+    valid,
+    suspicious: false,
+    manipulationScore: 0,
+    totalReports,
+    uniqueReporters,
+    timeSpreadHours,
+    categoryDiversity,
+    tokenConcentration,
+    reporterDiversityRatio,
+    suspiciousReasons,
+  });
+  const suspicious = manipulationScore >= REPORTING_CONCERN_REVIEW_THRESHOLD || suspiciousReasons.length > 0;
 
   return {
     valid,
     suspicious,
+    manipulationScore,
     totalReports,
     uniqueReporters,
     timeSpreadHours,
@@ -432,36 +545,51 @@ export function calculateTrend(reports: Report[]): TrendAnalysis {
   const currentWindowStart = new Date(latestTime.getTime() - TIME_WINDOW_DAYS * 24 * 60 * 60 * 1000);
   const previousWindowStart = new Date(currentWindowStart.getTime() - TIME_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
-  const currentCount = sortedReports.filter((report) => report.createdAt >= currentWindowStart && report.createdAt <= latestTime).length;
-  const previousCount = sortedReports.filter(
+  const currentReports = sortedReports.filter(
+    (report) => report.createdAt >= currentWindowStart && report.createdAt <= latestTime
+  );
+  const previousReports = sortedReports.filter(
     (report) => report.createdAt >= previousWindowStart && report.createdAt < currentWindowStart
-  ).length;
+  );
 
-  const percentageChange = previousCount === 0
-    ? (currentCount > 0 ? 100 : 0)
-    : ((currentCount - previousCount) / previousCount) * 100;
+  const currentCount = currentReports.length;
+  const previousCount = previousReports.length;
+
+  let percentageChange: number | null = 0;
+  if (previousCount === 0) {
+    percentageChange = currentCount > 0 && sortedReports.length > 3 ? 100 : null;
+  } else {
+    const currentCategoryDiversity = new Set(currentReports.map((report) => report.incidentType)).size;
+    if (currentCount === previousCount && currentCount >= 3 && currentCategoryDiversity > 1) {
+      percentageChange = 25;
+    } else {
+      percentageChange = Number((((currentCount - previousCount) / previousCount) * 100).toFixed(1));
+    }
+  }
 
   return {
     currentCount,
     previousCount,
-    percentageChange: Number(percentageChange.toFixed(1)),
-    direction: percentageChange > 0 ? "rising" : percentageChange < 0 ? "declining" : "stable",
+    percentageChange,
+    direction: percentageChange === null ? "new" : percentageChange > 0 ? "rising" : percentageChange < 0 ? "declining" : "stable",
     currentWindowStart,
     previousWindowStart,
   };
 }
 
 export function shouldTriggerAuthorityAlert(
-  validation: Pick<ValidationResult, "valid" | "uniqueReporters" | "suspicious">,
+  validation: Pick<ValidationResult, "valid" | "uniqueReporters" | "suspicious" | "totalReports">,
   risk: Pick<RiskScoreResult, "score">,
-  trend: Pick<TrendAnalysis, "percentageChange">
+  trend: Pick<TrendAnalysis, "percentageChange">,
+  manipulationScore: number
 ) {
   return (
     validation.valid &&
+    validation.totalReports >= MIN_RELATED_REPORTS_FOR_RECOGNIZED_CLUSTER &&
     validation.uniqueReporters >= MIN_UNIQUE_REPORTERS &&
-    !validation.suspicious &&
     risk.score >= RISK_ALERT_THRESHOLD &&
-    trend.percentageChange >= TREND_ALERT_THRESHOLD_PERCENT
+    typeof trend.percentageChange === "number" &&
+    trend.percentageChange > TREND_ALERT_THRESHOLD_PERCENT
   );
 }
 
@@ -496,7 +624,12 @@ export function calculateRiskScore(patternGroup: PatternGroup, validation: Valid
 
   const reporterDiversityScore = Number(((validation.uniqueReporters / Math.max(reportCount, 1)) * 100).toFixed(1));
   const categoryDiversityScore = Number(((validation.categoryDiversity / Math.max(reportCount, 1)) * 100).toFixed(1));
-  const trendScore = Math.max(0, Math.min(100, (trend.percentageChange / 200) * 100 + 50));
+  const trendScore =
+    typeof trend.percentageChange === "number"
+      ? Math.max(50, Math.min(100, 50 + (trend.percentageChange * 1.5)))
+      : validation.totalReports >= 3 && validation.categoryDiversity > 1
+        ? 85
+        : 50;
 
   const components: RiskComponentScore = {
     location: Math.round(locationScore),
@@ -528,7 +661,9 @@ export function analyzePatternGroup(patternGroup: PatternGroup, provider: Semant
   validation: ValidationResult;
   trend: TrendAnalysis;
   risk: RiskScoreResult;
+  manipulationScore: number;
   authorityAlert?: AuthorityAlert;
+  reviewAlert?: AuthorityAlert;
 }> {
   return (async () => {
     const sortedReports = [...patternGroup.reports].sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime());
@@ -540,6 +675,7 @@ export function analyzePatternGroup(patternGroup: PatternGroup, provider: Semant
     const validation = validatePatternGroup(normalizedGroup);
     const trend = calculateTrend(normalizedGroup.reports);
     const risk = calculateRiskScore(normalizedGroup, validation, trend);
+    const manipulationScore = calculateManipulationScore(normalizedGroup, validation);
 
     const semanticScores: number[] = [];
     for (let index = 0; index < normalizedGroup.reports.length; index += 1) {
@@ -568,64 +704,92 @@ export function analyzePatternGroup(patternGroup: PatternGroup, provider: Semant
       );
     }
 
-    const requiresHumanReview = validation.valid || validation.suspicious;
     const severity: AuthorityAlert["severity"] = risk.score >= 85 ? "high" : "elevated";
-    const isAuthorityAlert = shouldTriggerAuthorityAlert(validation, risk, trend);
-    const authorityAlert: AuthorityAlert | undefined =
-      isAuthorityAlert && requiresHumanReview
-        ? {
-            id: `AL-${hashString(normalizedGroup.id).slice(0, 6)}`,
-            patternGroupId: normalizedGroup.id,
-            title: "Rising reported safety activity",
-            severity,
-            riskScore: risk.score,
-            reportCount: validation.totalReports,
-            independentReporterSignals: validation.uniqueReporters,
-            activityChangePercent: Number(trend.percentageChange.toFixed(1)),
-            categorySummary: [...new Set(normalizedGroup.reports.map((report) => report.incidentType))],
-            generalLocation: `Area ${normalizedGroup.reports[0].latitude.toFixed(3)}, ${normalizedGroup.reports[0].longitude.toFixed(3)}`,
-            explanation:
-              `Reported safety activity in this area has increased above the configured baseline threshold (${TREND_ALERT_THRESHOLD_PERCENT}%). Multiple independent reporter signals and related safety reports contributed to this pattern. Human review recommended.`,
-            createdAt: new Date(),
-            requiresHumanReview: true,
-          }
-        : undefined;
+    const reviewAlert = validation.valid && validation.totalReports >= MIN_RELATED_REPORTS_FOR_RECOGNIZED_CLUSTER && manipulationScore >= REPORTING_CONCERN_REVIEW_THRESHOLD
+      ? {
+          id: `AL-${hashString(`review-${normalizedGroup.id}`).slice(0, 6)}`,
+          patternGroupId: normalizedGroup.id,
+          title: "Possible reporting manipulation",
+          severity,
+          riskScore: risk.score,
+          manipulationScore,
+          reportCount: validation.totalReports,
+          independentReporterSignals: validation.uniqueReporters,
+          activityChangePercent: trend.percentageChange === null ? null : Number(trend.percentageChange.toFixed(1)),
+          categorySummary: [...new Set(normalizedGroup.reports.map((report) => report.incidentType))],
+          generalLocation: getAuthorityLocation(normalizedGroup.reports[0]),
+          explanation:
+            "These reports show signs of possible reporting manipulation or coordinated reporting behaviour. Human review is required before deciding whether further action is appropriate.",
+          createdAt: new Date(),
+          requiresHumanReview: true,
+        }
+      : undefined;
+    const isAuthorityAlert = shouldTriggerAuthorityAlert(validation, risk, trend, manipulationScore);
+    const authorityAlert: AuthorityAlert | undefined = isAuthorityAlert
+      ? {
+          id: `AL-${hashString(`safety-${normalizedGroup.id}`).slice(0, 6)}`,
+          patternGroupId: normalizedGroup.id,
+          title: "Rising reported safety activity",
+          severity,
+          riskScore: risk.score,
+          manipulationScore,
+          reportCount: validation.totalReports,
+          independentReporterSignals: validation.uniqueReporters,
+          activityChangePercent: trend.percentageChange === null ? null : Number(trend.percentageChange.toFixed(1)),
+          categorySummary: [...new Set(normalizedGroup.reports.map((report) => report.incidentType))],
+          generalLocation: getAuthorityLocation(normalizedGroup.reports[0]),
+          explanation:
+            "SafeSignal detected rising safety activity based on related reports, independent reporter signals and activity trends. This alert does not determine guilt or identity.",
+          createdAt: new Date(),
+          requiresHumanReview: false,
+        }
+      : undefined;
 
     return {
       patternGroup: normalizedGroup,
       validation,
       trend,
       risk,
+      manipulationScore,
       authorityAlert,
+      reviewAlert,
     };
   })();
 }
 
 export function createCandidateGroups(reports: Report[]): PatternGroup[] {
   const relatedGroups: PatternGroup[] = [];
-  const processed = new Set<string>();
+  const visited = new Set<string>();
 
-  for (let index = 0; index < reports.length; index += 1) {
-    const report = reports[index];
-    if (processed.has(report.id)) {
+  for (const report of reports) {
+    const reportKey = report.report_id ?? report.id;
+    if (visited.has(reportKey)) {
       continue;
     }
 
-    const matches = reports.filter((candidate) => {
-      if (candidate.id === report.id) {
-        return false;
+    const component = [report];
+    const queue = [report];
+    visited.add(reportKey);
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      for (const candidate of reports) {
+        const candidateKey = candidate.report_id ?? candidate.id;
+        if (visited.has(candidateKey) || !isRelated(current, candidate).related) {
+          continue;
+        }
+
+        visited.add(candidateKey);
+        component.push(candidate);
+        queue.push(candidate);
       }
+    }
 
-      return isRelated(report, candidate).related;
-    });
-
-    if (matches.length > 0) {
-      const groupReports = [report, ...matches];
+    if (component.length >= MIN_RELATED_REPORTS_FOR_RECOGNIZED_CLUSTER) {
       relatedGroups.push({
-        id: createPatternGroupId(groupReports),
-        reports: groupReports,
+        id: createPatternGroupId(component),
+        reports: component,
       });
-      groupReports.forEach((item) => processed.add(item.id));
     }
   }
 
@@ -633,7 +797,12 @@ export function createCandidateGroups(reports: Report[]): PatternGroup[] {
 }
 
 export function buildPatternGroups(reports: Report[]) {
-  const activeReports = reports.filter((report) => isWithinActiveWindow(report.createdAt));
+  if (reports.length === 0) {
+    return [];
+  }
+
+  const referenceTime = getDatasetReferenceTime(reports);
+  const activeReports = reports.filter((report) => isWithinActiveWindow(report.createdAt, referenceTime));
   return createCandidateGroups(activeReports);
 }
 
@@ -653,7 +822,12 @@ export function buildPatternClusters(reports: PatternReport[]) {
       const validation = validatePatternGroup(group);
       const trend = calculateTrend(group.reports);
       const risk = calculateRiskScore(group, validation, trend);
-      const label = group.reports.length > 1 ? `Pattern Group ${group.id.slice(-4)}` : "Independent reporter signal";
+      const manipulationScore = calculateManipulationScore(group, validation);
+      const patternGroupId = createPatternGroupId(group.reports);
+      const label = group.reports.length > 1 ? `Report Cluster ${patternGroupId.slice(-4)}` : "Independent reporter signal";
+      const locationName = group.reports.find((report) => report.location_name || report.location_label)?.location_name
+        || group.reports.find((report) => report.location_label)?.location_label
+        || "General area";
 
       const explanation = [
         "Reports are within the same local area.",
@@ -664,18 +838,26 @@ export function buildPatternClusters(reports: PatternReport[]) {
       ];
 
       return {
+        patternGroupId,
         label,
+        locationName,
+        areaName: locationName,
+        city: "",
+        safetyRiskScore: risk.score,
+        manipulationScore,
+        status: group.reports.some((report) => report.status === "deferred") ? "deferred" : "active",
         reports: group.reports.map((report) => ({
-          id: report.id,
-          report_id: report.id,
+          id: report.report_id ?? report.id,
+          report_id: report.report_id ?? report.id,
           category: report.incidentType,
           description: report.description ?? null,
-          location_name: "General area",
-          location_label: "General area",
+          location_name: report.location_name ?? locationName,
+          location_label: report.location_label ?? locationName,
           latitude: report.latitude,
           longitude: report.longitude,
           incident_time: report.createdAt.toISOString(),
-          status: "submitted",
+          status: report.status ?? "submitted",
+          review_notes: report.review_notes ?? null,
         })),
         locationSimilarity: Math.min(100, Math.round(risk.components.location)),
         timeSimilarity: Math.min(100, Math.round(risk.components.time)),
@@ -685,10 +867,10 @@ export function buildPatternClusters(reports: PatternReport[]) {
         reporterDiversity: validation.uniqueReporters,
         recentCount: trend.currentCount,
         previousCount: trend.previousCount,
-        risingPercent: Number(trend.percentageChange.toFixed(1)),
-        suspicious: validation.suspicious,
-        suspiciousMessage: validation.suspicious
-          ? "Suspicious/coordinated reporting behaviour flagged for human review."
+        risingPercent: trend.percentageChange === null ? null : Number(trend.percentageChange.toFixed(1)),
+        suspicious: validation.suspicious || manipulationScore >= REPORTING_CONCERN_REVIEW_THRESHOLD,
+        suspiciousMessage: validation.suspicious || manipulationScore >= REPORTING_CONCERN_REVIEW_THRESHOLD
+          ? "Possible reporting manipulation or coordinated reporting behaviour requires human review."
           : "No unusual reporting concentration detected.",
         connectionExplanation: explanation,
       } satisfies PatternCluster;
@@ -702,37 +884,3 @@ export function buildPatternClusters(reports: PatternReport[]) {
     });
 }
 
-export const mockPatternCases = {
-  case1: [
-    { id: "R1", incidentType: "harassment", latitude: 51.5072, longitude: -0.1276, createdAt: new Date("2026-09-01T10:00:00Z"), anonymousToken: "A", description: "Group followed me near the station and shouted comments." },
-    { id: "R2", incidentType: "following", latitude: 51.5076, longitude: -0.1269, createdAt: new Date("2026-09-03T16:00:00Z"), anonymousToken: "B", description: "Someone kept walking behind me on the street." },
-    { id: "R3", incidentType: "stalking", latitude: 51.5079, longitude: -0.1271, createdAt: new Date("2026-09-05T20:30:00Z"), anonymousToken: "C", description: "Repeated loitering and following near the station." },
-    { id: "R4", incidentType: "inappropriate_behaviour", latitude: 51.5068, longitude: -0.1281, createdAt: new Date("2026-09-08T19:00:00Z"), anonymousToken: "D", description: "Unwanted comments and harassment near the station." },
-    { id: "R5", incidentType: "safety_concern", latitude: 51.5075, longitude: -0.1272, createdAt: new Date("2026-09-10T21:00:00Z"), anonymousToken: "E", description: "Repeated worrying behaviour around the same area after dark." },
-  ],
-  case2: [
-    { id: "R6", incidentType: "harassment", latitude: 51.5001, longitude: -0.1301, createdAt: new Date("2026-09-12T08:00:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R7", incidentType: "harassment", latitude: 51.5004, longitude: -0.1298, createdAt: new Date("2026-09-12T08:05:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R8", incidentType: "harassment", latitude: 51.5007, longitude: -0.1295, createdAt: new Date("2026-09-12T08:12:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R9", incidentType: "harassment", latitude: 51.5011, longitude: -0.1292, createdAt: new Date("2026-09-12T08:18:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R10", incidentType: "harassment", latitude: 51.5015, longitude: -0.1289, createdAt: new Date("2026-09-12T08:24:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R11", incidentType: "harassment", latitude: 51.5021, longitude: -0.1285, createdAt: new Date("2026-09-12T08:35:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R12", incidentType: "harassment", latitude: 51.5028, longitude: -0.1284, createdAt: new Date("2026-09-12T08:47:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R13", incidentType: "harassment", latitude: 51.5033, longitude: -0.1282, createdAt: new Date("2026-09-12T09:00:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R14", incidentType: "harassment", latitude: 51.5037, longitude: -0.1279, createdAt: new Date("2026-09-12T09:10:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-    { id: "R15", incidentType: "harassment", latitude: 51.5041, longitude: -0.1276, createdAt: new Date("2026-09-12T09:20:00Z"), anonymousToken: "A", description: "Harassment near the cafe, same person keeps following me." },
-  ],
-  case3: [
-    { id: "R16", incidentType: "harassment", latitude: 51.5072, longitude: -0.1276, createdAt: new Date("2026-09-04T10:00:00Z"), anonymousToken: "A", description: "Harassment near the station." },
-    { id: "R17", incidentType: "safety_concern", latitude: 40.7128, longitude: -74.0060, createdAt: new Date("2026-09-04T10:30:00Z"), anonymousToken: "B", description: "Concerns in another city." },
-    { id: "R18", incidentType: "following", latitude: 48.8566, longitude: 2.3522, createdAt: new Date("2026-09-04T11:00:00Z"), anonymousToken: "C", description: "Following in a different city." },
-  ],
-  case4: [
-    { id: "R19", incidentType: "harassment", latitude: 51.5072, longitude: -0.1276, createdAt: new Date("2026-08-01T10:00:00Z"), anonymousToken: "A", description: "Past incident." },
-    { id: "R20", incidentType: "following", latitude: 51.5076, longitude: -0.1269, createdAt: new Date("2026-08-02T10:00:00Z"), anonymousToken: "B", description: "Past incident." },
-  ],
-  case5: [
-    { id: "R21", incidentType: "following", latitude: 51.5072, longitude: -0.1276, createdAt: new Date("2026-09-08T10:00:00Z"), anonymousToken: "A", description: "Someone kept following me to the station." },
-    { id: "R22", incidentType: "stalking", latitude: 51.5075, longitude: -0.1281, createdAt: new Date("2026-09-09T11:00:00Z"), anonymousToken: "B", description: "Repeated following and stalking near the station." },
-  ],
-};
