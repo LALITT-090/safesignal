@@ -371,32 +371,63 @@ export async function listAuthorityAlerts(statusFilter?: string | null) {
     .map((alert) => alert.pattern_group_id)
     .filter((patternGroupId): patternGroupId is string => typeof patternGroupId === "string");
 
-  if (patternGroupIds.length === 0) {
-    return alerts;
-  }
-
   const { data: groups, error: groupsError } = await supabase
     .from("pattern_groups")
-    .select("pattern_group_id, manipulation_score, location_name, area_name")
-    .in("pattern_group_id", patternGroupIds);
+    .select("pattern_group_id, manipulation_score, location_name, area_name, safety_risk_score, report_count, independent_reporter_signals, suspicious_message, status, requires_human_review, activity_change_percent")
+    .in("pattern_group_id", patternGroupIds.length > 0 ? patternGroupIds : ["__NO_MATCH__"]);
 
   if (groupsError) throw new Error(groupsError.message);
 
   const groupsById = new Map((groups ?? []).map((group) => [group.pattern_group_id, group]));
   const coordinateLocation = /^Area\s+-?\d+(?:\.\d+)?,\s*-?\d+(?:\.\d+)?$/;
 
-  return alerts.map((alert) => {
+  const normalizedAlerts = alerts.map((alert) => {
     const group = groupsById.get(alert.pattern_group_id);
     const storedLocation = alert.general_location;
     const location = group?.location_name || group?.area_name;
 
     return {
       ...alert,
-      manipulation_score: group?.manipulation_score ?? null,
+      requires_human_review: group?.requires_human_review ?? false,
+      manipulation_score: group?.manipulation_score ?? alert.manipulation_score ?? null,
       general_location:
         location && (typeof storedLocation !== "string" || coordinateLocation.test(storedLocation))
           ? location
           : storedLocation,
     };
+  });
+
+  const reviewPatternGroupIds = new Set(normalizedAlerts.map((alert) => alert.pattern_group_id).filter(Boolean));
+  const { data: reviewGroups, error: reviewGroupsError } = await supabase
+    .from("pattern_groups")
+    .select("pattern_group_id, location_name, area_name, manipulation_score, safety_risk_score, report_count, independent_reporter_signals, suspicious_message, status, requires_human_review, activity_change_percent")
+    .eq("requires_human_review", true)
+    .in("status", ["active", "deferred"]);
+
+  if (reviewGroupsError) throw new Error(reviewGroupsError.message);
+
+  const reviewFallbacks = (reviewGroups ?? [])
+    .filter((group) => !reviewPatternGroupIds.has(group.pattern_group_id))
+    .filter((group) => !statusFilter || statusFilter === "all" || statusFilter === "new")
+    .map((group) => ({
+      id: `review-${group.pattern_group_id}`,
+      pattern_group_id: group.pattern_group_id,
+      title: "Possible reporting manipulation",
+      status: "new",
+      risk_score: Number(group.safety_risk_score ?? 0),
+      manipulation_score: Number(group.manipulation_score ?? 0),
+      report_count: Number(group.report_count ?? 0),
+      independent_reporter_signals: Number(group.independent_reporter_signals ?? 0),
+      activity_change_percent: group.activity_change_percent ?? null,
+      general_location: group.location_name || group.area_name || "Location unavailable",
+      explanation: group.suspicious_message || "These reports show signs of possible reporting manipulation or coordinated reporting behaviour. Human review is required before deciding whether further action is appropriate.",
+      requires_human_review: true,
+      pattern_group_unresolved: false,
+    }));
+
+  return [...normalizedAlerts, ...reviewFallbacks].sort((left, right) => {
+    const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0;
+    const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0;
+    return rightTime - leftTime;
   });
 }

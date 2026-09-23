@@ -18,6 +18,7 @@ type AuthorityAlertRecord = {
   activity_change_percent: number | null;
   general_location: string | null;
   explanation: string | null;
+  requires_human_review: boolean;
   pattern_group_unresolved: boolean;
 };
 
@@ -68,7 +69,7 @@ export default function OperationsPage() {
   }
 
   const safetyAlerts = useMemo(() => alerts.filter((alert) => alert.title === "Rising reported safety activity"), [alerts]);
-  const reviewAlerts = useMemo(() => alerts.filter((alert) => alert.title === "Possible reporting manipulation"), [alerts]);
+  const reviewAlerts = useMemo(() => alerts.filter((alert) => alert.requires_human_review || alert.title === "Possible reporting manipulation"), [alerts]);
 
   if (loading) return <main className="flex min-h-screen items-center justify-center bg-[#FAF8F5]">Loading alerts...</main>;
   if (error) return <main className="bg-[#FAF8F5] p-8 text-[#B91C1C]">{error}</main>;
@@ -101,7 +102,7 @@ function AlertSection({ title, empty, alerts, review, onStatusChange }: { title:
         return (
           <article key={alert.id} className="safe-card p-6">
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between"><div><p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#432A52]">{alert.pattern_group_id || "No cluster"}</p><h3 className="mt-2 text-2xl font-extrabold text-[#2D1B36]">{review ? "Possible Reporting Manipulation" : "Safety Alert"}</h3></div><span className="status-badge status-badge--medium">{alert.status}</span></div>
-            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Metric label="Location" value={alert.general_location || "Location unavailable"} /><Metric label="Related reports" value={String(alert.report_count ?? 0)} /><Metric label="Different reporters" value={String(alert.independent_reporter_signals ?? 0)} /><Metric label="Safety level" value={`${alert.risk_score ?? 0}/100`} /><Metric label="Reporting concern" value={String(alert.manipulation_score ?? 0)} /></div>
+            <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><Metric label="Location" value={alert.general_location || "Location unavailable"} /><Metric label="Related reports" value={String(alert.report_count ?? 0)} /><Metric label="Different reporters" value={String(alert.independent_reporter_signals ?? 0)} /><Metric label="Safety level" value={`${alert.risk_score ?? 0}/100`} /><Metric label="Reporting concern" value={review ? "HIGH" : String(alert.manipulation_score ?? 0)} /></div>
             <p className="mt-5 text-sm leading-7 text-[#5E5967]">{review ? "These reports show signs of possible reporting manipulation or coordinated reporting behaviour. Human review is required before deciding whether further action is appropriate." : alert.explanation || "Reported activity is rising above the configured threshold."}</p>
             <div className="mt-5 flex flex-wrap gap-3">{alert.pattern_group_unresolved ? <span className="rounded-full border border-[#E7E0E3] bg-[#FAF8F5] px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#5E5967]">Cluster details unavailable for this historical alert</span> : hasPatternGroup ? <Link href={review ? `/reviews?patternGroupId=${encodeURIComponent(alert.pattern_group_id)}` : `/patterns/${encodeURIComponent(alert.pattern_group_id)}`} className="primary-btn">{review ? "Review" : "View Alert"}</Link> : <span className="rounded-full border border-[#E7E0E3] bg-[#FAF8F5] px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-[#5E5967]">No cluster link</span>}{alert.status === "new" && <button type="button" onClick={() => void onStatusChange(alert.id, "acknowledged")} className="secondary-btn">Acknowledge</button>}{alert.status === "acknowledged" && <button type="button" onClick={() => void onStatusChange(alert.id, "resolved")} className="secondary-btn">Resolve</button>}</div>
           </article>
